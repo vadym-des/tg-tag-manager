@@ -658,9 +658,19 @@
             width: 170px;
             overflow: hidden;
         }
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none !important;
+            margin: 0 !important;
+        }
+        input[type="number"] {
+            -moz-appearance: textfield !important;
+            appearance: textfield !important;
+        }
         .break-custom-row {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 4px;
             padding: 6px 8px;
             background: rgba(15, 23, 33, 0.6);
@@ -675,16 +685,9 @@
             font-size: 11px;
             text-align: center;
             outline: none;
-            width: 45px;
-        }
-        .break-custom-row input[type="number"]::-webkit-outer-spin-button,
-        .break-custom-row input[type="number"]::-webkit-inner-spin-button {
-            -webkit-appearance: none;
-            margin: 0;
-        }
-        .break-custom-row input[type="number"] {
-            -moz-appearance: textfield;
-            appearance: textfield;
+            width: 44px;
+            height: 24px;
+            box-sizing: border-box;
         }
         .break-custom-row input:focus {
             border-color: var(--tg-accent);
@@ -693,20 +696,27 @@
             color: var(--tg-text-muted);
             font-weight: bold;
             font-size: 12px;
+            user-select: none;
         }
         .btn-custom-start {
             background: var(--tg-accent);
             color: #fff;
             border: none;
             border-radius: 4px;
-            padding: 4px 8px;
+            padding: 0 8px;
+            height: 24px;
             cursor: pointer;
             font-size: 11px;
             font-weight: bold;
-            transition: opacity 0.15s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.15s, background-color 0.15s;
+            flex-shrink: 0;
         }
         .btn-custom-start:hover {
-            opacity: 0.9;
+            background: var(--tg-accent-hover, #2077e3);
+            opacity: 0.95;
         }
         .btn-break-trigger:disabled,
         .card.is-outage .btn-break-trigger {
@@ -726,8 +736,8 @@
             transition: background 0.15s, color 0.15s;
         }
         .btn-break-option:hover {
-            background: var(--tg-card-hover);
-            color: var(--tg-accent);
+            background: var(--tg-accent);
+            color: #ffffff;
         }
         .break-countdown-badge {
             display: inline-flex;
@@ -937,7 +947,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.12
+    <span class="badge-dot"></span> v1.4.13
 </div>
 
 <div class="container">
@@ -1029,7 +1039,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.12</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.13</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>

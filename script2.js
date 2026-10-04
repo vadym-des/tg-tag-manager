@@ -1301,6 +1301,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 const APP_CHANGELOG = [
     {
+        version: "1.4.13",
+        date: "2026-10-04",
+        changes: [
+            { category: "Fixed", text: "Глобальне приховування числових стрілок-спінерів (spin-arrows) для всіх числових інпутів додатка." },
+            { category: "Fixed", text: "Покращено контрастність та читабельність тексту пунктів меню перерв при наведенні курсора." },
+            { category: "Fixed", text: "Оптимізовано верстку та вирівнювання кнопки запуску кастомного таймера (▶)." }
+        ]
+    },
+    {
         version: "1.4.12",
         date: "2026-10-04",
         changes: [
