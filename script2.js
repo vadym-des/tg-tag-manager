@@ -858,13 +858,30 @@ function toggleBreakMenu(id, event) {
     `;
 
     wrap.appendChild(popover);
+    adjustPopoverPosition(popover);
 
     setTimeout(() => {
+        adjustPopoverPosition(popover);
         const rect = popover.getBoundingClientRect();
         if (rect.bottom > window.innerHeight) {
             popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     }, 10);
+}
+
+function adjustPopoverPosition(popover) {
+    if (!popover) return;
+    popover.style.transform = 'none';
+    const rect = popover.getBoundingClientRect();
+    const padding = 12;
+
+    if (rect.left < padding) {
+        const shiftX = Math.round(padding - rect.left);
+        popover.style.transform = `translateX(${shiftX}px)`;
+    } else if (rect.right > window.innerWidth - padding) {
+        const shiftX = Math.round((window.innerWidth - padding) - rect.right);
+        popover.style.transform = `translateX(${shiftX}px)`;
+    }
 }
 
 function startCustomBreak(id, event) {
@@ -1124,6 +1141,10 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('.break-menu-popover') && !e.target.closest('.btn-break-trigger')) {
         document.querySelectorAll('.break-menu-popover').forEach(p => p.remove());
     }
+});
+
+window.addEventListener('resize', () => {
+    document.querySelectorAll('.break-menu-popover').forEach(adjustPopoverPosition);
 });
 
 // Форс-мажори (Outage Toggle)
@@ -1497,6 +1518,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.18",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Автоматичне позиціонування та авто-вирівнювання спливаючого вікна перерви: тепер воно ніколи не вилазить за ліву або праву межу екрана при відкритті на крайніх картках." }
+        ]
+    },
     {
         version: "1.4.17",
         date: "2026-11-02",
