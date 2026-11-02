@@ -361,6 +361,7 @@ function saveInteractiveDB() {
     updateButtonStates();
     toggleModal();
     processInput();
+    triggerAutoCloudSync();
     alert(`Зміни збережено! Всього операторів: ${Object.keys(db).length}`);
 }
 
@@ -1617,6 +1618,381 @@ function fallbackCopy(area) {
     }
 }
 
+// ==========================================
+// GOOGLE SHEETS & CLOUD SYNC MODULE
+// ==========================================
+
+function toggleCloudModal() {
+    const modal = document.getElementById('cloudModal');
+    if (!modal) return;
+    const isVisible = modal.style.display === 'flex';
+    modal.style.display = isVisible ? 'none' : 'flex';
+    if (!isVisible) {
+        initCloudModalFields();
+    }
+}
+
+function initCloudModalFields() {
+    const sheetsInput = document.getElementById('cloudSheetsUrlInput');
+    const appsScriptInput = document.getElementById('cloudAppsScriptUrlInput');
+    const autoFetchCb = document.getElementById('cloudAutoFetchOnStart');
+
+    if (sheetsInput) {
+        sheetsInput.value = localStorage.getItem('google_sheets_url') || '';
+    }
+    if (appsScriptInput) {
+        appsScriptInput.value = localStorage.getItem('google_apps_script_url') || '';
+    }
+    if (autoFetchCb) {
+        autoFetchCb.checked = localStorage.getItem('cloud_auto_fetch') === 'true';
+    }
+    updateCloudModalBadge();
+}
+
+function toggleAutoFetchSetting(checked) {
+    localStorage.setItem('cloud_auto_fetch', checked ? 'true' : 'false');
+    showToast(checked ? '✓ Авто-підтягування при старті увімкнено' : '✓ Авто-підтягування вимкнено');
+}
+
+function updateCloudModalBadge() {
+    const badge = document.getElementById('cloudModalStatusBadge');
+    if (!badge) return;
+    const hasAppsScript = !!localStorage.getItem('google_apps_script_url');
+    const hasSheets = !!localStorage.getItem('google_sheets_url');
+
+    if (hasAppsScript) {
+        badge.innerText = '🟢 Двостороння синхронізація (Apps Script)';
+        badge.style.color = '#10b981';
+    } else if (hasSheets) {
+        badge.innerText = '🔵 Читання за посиланням (Google Sheets)';
+        badge.style.color = 'var(--tg-accent)';
+    } else {
+        badge.innerText = '⚪️ Локальний режим';
+        badge.style.color = 'var(--tg-text-muted)';
+    }
+}
+
+function extractSpreadsheetId(url) {
+    if (!url) return null;
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    return match ? match[1] : null;
+}
+
+function formatSyncTime(ts) {
+    const d = ts ? new Date(Number(ts)) : new Date();
+    const h = String(d.getHours()).padStart(2, '0');
+    const m = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${m}`;
+}
+
+function setSyncStatus(status, text) {
+    const badge = document.getElementById('cloudSyncBadge');
+    const textElem = document.getElementById('cloudSyncStatusText');
+    const dbStatus = document.getElementById('dbModalCloudStatus');
+    const dot = badge ? badge.querySelector('.sync-dot') : null;
+
+    if (dot) {
+        dot.className = 'sync-dot';
+        if (status === 'synced') {
+            dot.classList.add('sync-active');
+        } else if (status === 'syncing') {
+            dot.classList.add('sync-loading');
+        } else if (status === 'pending') {
+            dot.classList.add('sync-pending');
+        } else if (status === 'error') {
+            dot.classList.add('sync-error');
+        } else {
+            dot.classList.add('sync-offline');
+        }
+    }
+
+    if (textElem) {
+        textElem.innerText = text || (status === 'synced' ? 'Хмара: ОК' : 'Хмара: офлайн');
+    }
+
+    if (dbStatus) {
+        if (status === 'synced') {
+            dbStatus.innerHTML = `🟢 Хмара: синхронізовано (${formatSyncTime()})`;
+            dbStatus.style.color = '#10b981';
+        } else if (status === 'syncing') {
+            dbStatus.innerHTML = `🟡 Хмара: збереження...`;
+            dbStatus.style.color = '#f59e0b';
+        } else if (status === 'error') {
+            dbStatus.innerHTML = `🔴 Хмара: помилка синхронізації`;
+            dbStatus.style.color = '#ef4444';
+        } else {
+            dbStatus.innerHTML = `Зберігається локально у браузері`;
+            dbStatus.style.color = 'var(--tg-text-muted)';
+        }
+    }
+
+    updateCloudModalBadge();
+}
+
+function importFromGoogleSheetsUrl(isQuiet = false) {
+    const input = document.getElementById('cloudSheetsUrlInput');
+    const url = input && input.value.trim() ? input.value.trim() : (localStorage.getItem('google_sheets_url') || '');
+
+    if (!url) {
+        if (!isQuiet) alert('Будь ласка, вставте посилання на Google Таблицю');
+        return;
+    }
+
+    const sheetId = extractSpreadsheetId(url);
+    if (!sheetId) {
+        if (!isQuiet) alert('Некоректне посилання. Воно повинно містити /spreadsheets/d/{ID}...');
+        return;
+    }
+
+    localStorage.setItem('google_sheets_url', url);
+    setSyncStatus('syncing', 'Хмара: завантаження...');
+
+    fetchGoogleSheetsGviz(sheetId, (newDb) => {
+        const count = Object.keys(newDb).length;
+        if (count === 0) {
+            setSyncStatus('error', 'Хмара: таблиця порожня');
+            if (!isQuiet) alert('У таблиці не знайдено записів операторів');
+            return;
+        }
+
+        db = newDb;
+        localStorage.setItem('opsDB', JSON.stringify(db));
+        localStorage.setItem('operator_db', JSON.stringify(db));
+        localStorage.setItem('last_cloud_sync', Date.now().toString());
+
+        updateButtonStates();
+        processInput();
+        setSyncStatus('synced', `Хмара: ОК (${formatSyncTime()})`);
+        showToast(`✓ Успішно завантажено ${count} операторів з Google Sheets!`);
+    }, (err) => {
+        setSyncStatus('error', 'Хмара: помилка читання');
+        if (!isQuiet) {
+            alert('Не вдалося отримати дані: ' + err + '\nПеревірте доступ за посиланням («Усі, хто має посилання, можуть переглядати»).');
+        }
+    });
+}
+
+function fetchGoogleSheetsGviz(sheetId, onSuccess, onError) {
+    const cbName = 'gvizCb_' + Math.floor(Math.random() * 1000000);
+    const script = document.createElement('script');
+    script.id = cbName;
+    script.src = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=responseHandler:${cbName}`;
+
+    let isDone = false;
+    const timeout = setTimeout(() => {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        if (onError) onError('Час очікування відповіді від Google Sheets вичерпано');
+    }, 12000);
+
+    function cleanup() {
+        clearTimeout(timeout);
+        delete window[cbName];
+        const elem = document.getElementById(cbName);
+        if (elem) elem.remove();
+    }
+
+    window[cbName] = function(res) {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+
+        if (!res || !res.table || !res.table.rows) {
+            if (onError) onError('Некоректний формат відповіді Google Sheets');
+            return;
+        }
+
+        try {
+            const parsedDb = parseGvizTable(res.table);
+            if (onSuccess) onSuccess(parsedDb);
+        } catch (e) {
+            if (onError) onError(e.message);
+        }
+    };
+
+    script.onerror = function() {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        if (onError) onError('Помилка завантаження. Перевірте доступ «Усі, хто має посилання, можуть переглядати».');
+    };
+
+    document.body.appendChild(script);
+}
+
+function parseGvizTable(table) {
+    const cols = (table.cols || []).map(c => (c.label || '').toLowerCase().trim());
+    let idIdx = cols.findIndex(c => c.includes('id') || c.includes('номер'));
+    let nameIdx = cols.findIndex(c => c.includes('ім') || c.includes('name'));
+    let tagIdx = cols.findIndex(c => c.includes('тег') || c.includes('handle') || c.includes('telegram'));
+    let statusIdx = cols.findIndex(c => c.includes('статус') || c.includes('status'));
+
+    let startRow = 0;
+    if (idIdx === -1 && table.rows.length > 0) {
+        const firstVals = (table.rows[0].c || []).map(cell => cell && cell.v !== undefined ? String(cell.v).toLowerCase().trim() : '');
+        idIdx = firstVals.findIndex(c => c.includes('id') || c.includes('номер'));
+        nameIdx = firstVals.findIndex(c => c.includes('ім') || c.includes('name'));
+        tagIdx = firstVals.findIndex(c => c.includes('тег') || c.includes('handle') || c.includes('telegram'));
+        statusIdx = firstVals.findIndex(c => c.includes('статус') || c.includes('status'));
+        if (idIdx !== -1) startRow = 1;
+    }
+
+    if (idIdx === -1) idIdx = 0;
+    if (nameIdx === -1) nameIdx = 1;
+    if (tagIdx === -1) tagIdx = 2;
+    if (statusIdx === -1) statusIdx = 3;
+
+    const newDb = {};
+    for (let i = startRow; i < table.rows.length; i++) {
+        const r = table.rows[i].c || [];
+        const rawId = r[idIdx] ? (r[idIdx].v !== undefined ? r[idIdx].v : r[idIdx].f) : null;
+        if (rawId === null || rawId === undefined || String(rawId).trim() === '') continue;
+
+        const id = String(rawId).trim();
+        const name = r[nameIdx] && r[nameIdx].v !== undefined ? String(r[nameIdx].v).trim() : '';
+        let tag = r[tagIdx] && r[tagIdx].v !== undefined ? String(r[tagIdx].v).trim() : '';
+        if (tag && !tag.startsWith('@')) tag = `@${tag}`;
+
+        const rawStatus = r[statusIdx] && r[statusIdx].v !== undefined ? String(r[statusIdx].v).trim() : 'Активний';
+        const isDismissed = rawStatus.toLowerCase().includes('звільн') || name.toLowerCase().includes('звільн');
+
+        newDb[id] = {
+            name: name,
+            tag: tag,
+            handle: tag,
+            status: isDismissed ? 'Звільнився' : 'Активний',
+            dismissed: isDismissed
+        };
+    }
+    return newDb;
+}
+
+function saveAppsScriptUrl() {
+    const input = document.getElementById('cloudAppsScriptUrlInput');
+    const url = input ? input.value.trim() : '';
+    if (!url) {
+        localStorage.removeItem('google_apps_script_url');
+        setSyncStatus('offline', 'Хмара: локально');
+        showToast('ℹ️ Apps Script URL видалено (локальний режим)');
+        return;
+    }
+
+    if (!url.startsWith('https://script.google.com/')) {
+        alert('Apps Script Web App URL повинен починатися з https://script.google.com/macros/s/.../exec');
+        return;
+    }
+
+    localStorage.setItem('google_apps_script_url', url);
+    showToast('✓ Apps Script URL збережено!');
+    triggerAutoCloudSync();
+}
+
+async function pushToGoogleAppsScript(scriptUrl, currentDb, onSuccess, onError) {
+    if (!scriptUrl) {
+        if (onError) onError('Немає Apps Script URL');
+        return;
+    }
+
+    const payload = [];
+    Object.keys(currentDb).forEach(id => {
+        const item = currentDb[id];
+        payload.push({
+            id: id,
+            name: item.name || '',
+            tag: item.tag || item.handle || '',
+            status: item.status || (item.dismissed ? 'Звільнився' : 'Активний')
+        });
+    });
+
+    try {
+        await fetch(scriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ operators: payload, timestamp: Date.now() })
+        });
+        if (onSuccess) onSuccess();
+    } catch (err) {
+        if (onError) onError(err);
+    }
+}
+
+function triggerAutoCloudSync() {
+    const scriptUrl = localStorage.getItem('google_apps_script_url');
+    if (!scriptUrl) {
+        const sheetsUrl = localStorage.getItem('google_sheets_url');
+        if (sheetsUrl) {
+            setSyncStatus('pending', 'Хмара: не збережено');
+        } else {
+            setSyncStatus('offline', 'Хмара: локально');
+        }
+        return;
+    }
+
+    setSyncStatus('syncing', 'Хмара: збереження...');
+    pushToGoogleAppsScript(scriptUrl, db, () => {
+        const nowStr = formatSyncTime();
+        localStorage.setItem('last_cloud_sync', Date.now().toString());
+        setSyncStatus('synced', `Хмара: ОК (${nowStr})`);
+        showToast('✓ Зміни синхронізовано з Google Sheets!');
+    }, () => {
+        setSyncStatus('error', 'Хмара: помилка запису');
+        showToast('⚠️ Помилка надсилання змін у Google Sheets');
+    });
+}
+
+function syncAllCloudNow() {
+    const scriptUrl = localStorage.getItem('google_apps_script_url');
+    const sheetsUrl = localStorage.getItem('google_sheets_url');
+
+    if (!scriptUrl && !sheetsUrl) {
+        alert('Будь ласка, спочатку вкажіть посилання на Google Таблицю або Apps Script URL');
+        return;
+    }
+
+    if (sheetsUrl) {
+        importFromGoogleSheetsUrl(false);
+    } else if (scriptUrl) {
+        triggerAutoCloudSync();
+    }
+}
+
+function copyAppsScriptCode() {
+    const codeElem = document.getElementById('appsScriptCodeTemplate');
+    if (!codeElem) return;
+    const code = codeElem.innerText;
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(code)
+            .then(() => showToast('✓ Код Apps Script скопійовано!'))
+            .catch(() => fallbackCopyText(code, () => showToast('✓ Код скопійовано!')));
+    } else {
+        fallbackCopyText(code, () => showToast('✓ Код скопійовано!'));
+    }
+}
+
+function initCloudSyncStatus() {
+    const hasAppsScript = !!localStorage.getItem('google_apps_script_url');
+    const hasSheets = !!localStorage.getItem('google_sheets_url');
+    const lastSync = localStorage.getItem('last_cloud_sync');
+    const autoFetch = localStorage.getItem('cloud_auto_fetch') === 'true';
+
+    if (hasAppsScript) {
+        setSyncStatus('synced', `Хмара: ОК (${formatSyncTime(lastSync)})`);
+    } else if (hasSheets) {
+        setSyncStatus('synced', `Хмара: лінк (${formatSyncTime(lastSync)})`);
+    } else {
+        setSyncStatus('offline', 'Хмара: локально');
+    }
+
+    if (autoFetch && hasSheets) {
+        importFromGoogleSheetsUrl(true);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem('opsDB') && !localStorage.getItem('operator_db')) {
         try {
@@ -1647,10 +2023,19 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
     updateButtonStates();
     initTemplateDate();
+    initCloudSyncStatus();
     processInput();
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.22",
+        date: "2026-11-02",
+        changes: [
+            { category: "Added", text: "Хмарна синхронізація з Google Sheets: Варіант 1 (швидкий імпорт та авто-оновлення за публічним посиланням) та Варіант 2 (двостороння синхронізація через Google Apps Script з авто-збереженням будь-яких змін бази)." },
+            { category: "Added", text: "Інтерактивний статус-індикатор хмари з кольоровою крапкою (🟢 Синхронізовано, 🟡 Збереження, 🔴 Помилка, ⚪️ Локально) та модальне вікно налаштувань із вбудованим кодом Google Apps Script." }
+        ]
+    },
     {
         version: "1.4.21",
         date: "2026-11-02",

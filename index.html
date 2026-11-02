@@ -535,6 +535,115 @@
             box-shadow: 0 0 6px var(--tg-success);
         }
 
+        /* Cloud Sync Badge & Buttons */
+        .sync-status-badge {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: var(--tg-card);
+            color: var(--tg-text);
+            border: 1px solid var(--tg-border);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            user-select: none;
+        }
+        .sync-status-badge:hover {
+            border-color: var(--tg-accent);
+            background: var(--tg-card-hover);
+            transform: translateY(-1px);
+        }
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        .sync-dot.sync-active { background: #10b981; box-shadow: 0 0 6px #10b981; }
+        .sync-dot.sync-loading { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; animation: pulseSync 1s infinite; }
+        .sync-dot.sync-pending { background: #f97316; box-shadow: 0 0 6px #f97316; }
+        .sync-dot.sync-error { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+        .sync-dot.sync-offline { background: #6b7280; }
+
+        @keyframes pulseSync {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.8); }
+        }
+
+        .btn-cloud {
+            background: #059669;
+            color: #ffffff;
+            border: 1px solid #10b981;
+        }
+        .btn-cloud:hover {
+            background: #047857;
+            border-color: #34d399;
+        }
+
+        .cloud-section-card {
+            background: var(--tg-input-bg);
+            border: 1px solid var(--tg-border);
+            border-radius: 10px;
+            padding: 14px;
+            margin-bottom: 14px;
+        }
+        .cloud-section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--tg-accent);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .cloud-section-desc {
+            font-size: 12px;
+            color: var(--tg-text-muted);
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .cloud-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .cloud-input-group input {
+            flex: 1;
+            height: 38px;
+            background: var(--tg-card);
+            border: 1px solid var(--tg-input-border);
+            border-radius: 8px;
+            color: var(--tg-text);
+            font-size: 13px;
+            padding: 0 10px;
+            outline: none;
+        }
+        .cloud-input-group input:focus {
+            border-color: var(--tg-accent);
+        }
+        .cloud-code-block {
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 11px;
+            color: #cbd5e1;
+            max-height: 130px;
+            overflow-y: auto;
+            white-space: pre;
+            margin-bottom: 8px;
+            user-select: all;
+        }
+
         .changelog-card {
             background: var(--tg-input-bg);
             border: 1px solid var(--tg-border);
@@ -1171,6 +1280,12 @@
                 max-width: 55%;
                 text-align: right;
             }
+            .sync-status-badge {
+                top: 10px;
+                right: 10px;
+                font-size: 11px;
+                padding: 4px 8px;
+            }
             .calc-divider {
                 display: none;
             }
@@ -1223,7 +1338,11 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.21
+    <span class="badge-dot"></span> v1.4.22
+</div>
+
+<div id="cloudSyncBadge" class="sync-status-badge" onclick="toggleCloudModal()" title="Статус хмарної синхронізації з Google Sheets">
+    <span class="sync-dot sync-offline"></span> <span id="cloudSyncStatusText">Хмара: локально</span>
 </div>
 
 <div class="container">
@@ -1232,6 +1351,7 @@
     
     <div class="controls-grid">
         <button id="btnProcess" onclick="processInput()">Process IDs</button>
+        <button id="btnCloudSync" type="button" onclick="toggleCloudModal()" class="btn-cloud" title="Синхронізація з Google Sheets">☁️ Google Sheets</button>
         <button id="btnImport" onclick="document.getElementById('fileImporter').click()" class="btn-import">Import Base (Excel/JSON)</button>
         <button id="btnExport" type="button" onclick="exportDbToExcel()" class="btn-export">Export Base (Excel)</button>
         <input type="file" id="fileImporter" accept=".xlsx, .xls, .json" style="display:none;" onchange="handleFileImport(event)">
@@ -1307,11 +1427,121 @@
             <div id="dbTableContainer" class="db-table-container"></div>
         </div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Зберігається локально у браузері</span>
+            <span id="dbModalCloudStatus" style="font-size:13px; color:var(--tg-text-muted);">Зберігається локально у браузері</span>
             <div class="modal-footer-btns">
                 <button type="button" onclick="exportDbToExcel()" class="btn-import">Export Excel</button>
                 <button onclick="saveInteractiveDB()">Save & Reload</button>
                 <button onclick="toggleModal()" class="btn-danger">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="cloudModal" class="modal">
+    <div class="modal-content" style="max-width: 650px;">
+        <div class="modal-header">
+            <div class="modal-title-row">
+                <h3 class="modal-title">☁️ Синхронізація з Google Sheets</h3>
+                <span id="cloudModalStatusBadge" style="font-size:12px; font-weight:600; color:var(--tg-text-muted);">Локальний режим</span>
+            </div>
+        </div>
+        <div class="modal-body" style="max-height: 65vh; overflow-y: auto;">
+            <!-- Секція 1: Швидке читання з посилання -->
+            <div class="cloud-section-card">
+                <div class="cloud-section-title">
+                    <span>1. Швидкий імпорт / оновлення за посиланням</span>
+                    <span style="font-size:11px; background:rgba(16, 185, 129, 0.15); color:#10b981; padding:2px 6px; border-radius:4px;">Read-Only</span>
+                </div>
+                <div class="cloud-section-desc">
+                    Вставте посилання на вашу Google Таблицю (має бути відкритий доступ: <i>«Усі, хто має посилання, можуть переглядати»</i>).
+                </div>
+                <div class="cloud-input-group">
+                    <input type="url" id="cloudSheetsUrlInput" placeholder="https://docs.google.com/spreadsheets/d/1a2b3c4d5e.../edit" title="Посилання на Google Таблицю">
+                    <button type="button" class="btn-import" onclick="importFromGoogleSheetsUrl()" style="white-space:nowrap; padding:0 14px;">📥 Завантажити</button>
+                </div>
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--tg-text-muted); cursor:pointer; margin-top:6px;">
+                    <input type="checkbox" id="cloudAutoFetchOnStart" onchange="toggleAutoFetchSetting(this.checked)">
+                    Автоматично підтягувати свіжу базу при кожному запуску сторінки
+                </label>
+            </div>
+
+            <!-- Секція 2: Повна двостороння синхронізація -->
+            <div class="cloud-section-card">
+                <div class="cloud-section-title">
+                    <span>2. Двостороння синхронізація (Читання + Авто-запис)</span>
+                    <span style="font-size:11px; background:rgba(46, 166, 255, 0.15); color:var(--tg-accent); padding:2px 6px; border-radius:4px;">Two-Way Sync</span>
+                </div>
+                <div class="cloud-section-desc">
+                    Дозволяє автоматично зберігати будь-які зміни (додавання, зміна статусу або видалення оператора) прямо у вашу Google Таблицю через Apps Script.
+                </div>
+                <div class="cloud-input-group">
+                    <input type="url" id="cloudAppsScriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" title="Web App URL з Google Apps Script">
+                    <button type="button" class="btn-primary" onclick="saveAppsScriptUrl()" style="white-space:nowrap; padding:0 14px;">💾 Зберегти</button>
+                </div>
+                
+                <details style="margin-top:10px;">
+                    <summary style="font-size:12px; font-weight:600; color:var(--tg-accent); cursor:pointer;">
+                        📖 Інструкція налаштування Google Apps Script за 1 хвилину
+                    </summary>
+                    <div style="font-size:12px; color:var(--tg-text-muted); line-height:1.5; margin-top:8px;">
+                        <ol style="padding-left:18px; margin:0 0 8px 0;">
+                            <li>У вашій Google Таблиці відкрийте меню: <b>Розширення (Extensions) ➔ Apps Script</b>.</li>
+                            <li>Видаліть усе та вставте наведений нижче код.</li>
+                            <li>Натисніть <b>Розгорнути (Deploy) ➔ Нове розгортання (New deployment)</b>.</li>
+                            <li>Оберіть тип: <b>Веб-додаток (Web app)</b>, доступ (Who has access): <b>Усі (Anyone)</b>.</li>
+                            <li>Скопіюйте отриманий <b>Web App URL</b> у поле вище.</li>
+                        </ol>
+                        <div class="cloud-code-block" id="appsScriptCodeTemplate">function doGet(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var rows = [];
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][0]) continue;
+    rows.push({
+      id: String(data[i][0]).trim(),
+      name: String(data[i][1] || '').trim(),
+      tag: String(data[i][2] || '').trim(),
+      status: String(data[i][3] || 'Активний').trim()
+    });
+  }
+  return ContentService.createTextOutput(JSON.stringify({ status: "success", data: rows }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+function doPost(e) {
+  try {
+    var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    var payload = JSON.parse(e.postData.contents);
+    var operators = payload.operators || payload;
+    sheet.clearContents();
+    var output = [["ID", "Ім'я", "Telegram Handle", "Статус"]];
+    for (var i = 0; i < operators.length; i++) {
+      var op = operators[i];
+      output.push([
+        op.id,
+        op.name || '',
+        op.tag || '',
+        op.status || (op.dismissed ? 'Звільнився' : 'Активний')
+      ]);
+    }
+    sheet.getRange(1, 1, output.length, 4).setValues(output);
+    return ContentService.createTextOutput(JSON.stringify({ status: "success", count: operators.length }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ status: "error", message: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}</div>
+                        <button type="button" class="btn-secondary" style="font-size:11px; padding:4px 10px;" onclick="copyAppsScriptCode()">📋 Скопіювати код скрипта</button>
+                    </div>
+                </details>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <span style="font-size:12px; color:var(--tg-text-muted);">Безпека Zero-Leak: дані та посилання зберігаються локально.</span>
+            <div class="modal-footer-btns">
+                <button type="button" onclick="syncAllCloudNow()" class="btn-import">🔄 Синхронізувати зараз</button>
+                <button type="button" onclick="toggleCloudModal()" class="btn-secondary">Закрити</button>
             </div>
         </div>
     </div>
@@ -1335,7 +1565,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.21</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.22</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
