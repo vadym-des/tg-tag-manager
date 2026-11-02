@@ -1881,6 +1881,15 @@ function importFromGoogleSheetsUrl(isQuiet = false) {
             return;
         }
 
+        // Обережне об'єднання з локальною базою: якщо в завантаженій таблиці колонка Графік порожня або відсутня,
+        // але у користувача локально вже збережено графік для цього ID — зберігаємо локальний графік!
+        const existingDb = db || {};
+        for (const [id, op] of Object.entries(newDb)) {
+            if (!op.schedule && existingDb[id] && existingDb[id].schedule) {
+                op.schedule = existingDb[id].schedule;
+            }
+        }
+
         db = newDb;
         localStorage.setItem('opsDB', JSON.stringify(db));
         localStorage.setItem('operator_db', JSON.stringify(db));
@@ -2199,6 +2208,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.27",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Захист від затирання графіків при авто-синхронізації: при автозавантаженні з Google Sheets додано розумне об'єднання (smart merge). Якщо в Google Таблиці ще немає колонки «Графік» або вона порожня, локально збережені години операторів більше ніколи не скидаються." },
+            { category: "Added", text: "Оновлено шаблон Google Apps Script (Two-Way Sync): додано 5-ту колонку «Графік» у функції doGet та doPost, щоб індивідуальні графіки автоматично зберігалися безпосередньо у саму Google Таблицю." }
+        ]
+    },
     {
         version: "1.4.26",
         date: "2026-11-02",

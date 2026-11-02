@@ -1475,7 +1475,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.26
+    <span class="badge-dot"></span> v1.4.27
 </div>
 
 <div id="cloudSyncBadge" class="sync-status-badge" onclick="toggleCloudModal()" title="Статус хмарної синхронізації з Google Sheets">
@@ -1658,7 +1658,8 @@
       id: String(data[i][0]).trim(),
       name: String(data[i][1] || '').trim(),
       tag: String(data[i][2] || '').trim(),
-      status: String(data[i][3] || 'Активний').trim()
+      schedule: String(data[i][3] || '').trim(),
+      status: String(data[i][4] || 'Активний').trim()
     });
   }
   return ContentService.createTextOutput(JSON.stringify({ status: "success", data: rows }))
@@ -1671,17 +1672,18 @@ function doPost(e) {
     var payload = JSON.parse(e.postData.contents);
     var operators = payload.operators || payload;
     sheet.clearContents();
-    var output = [["ID", "Ім'я", "Telegram Handle", "Статус"]];
+    var output = [["ID", "Ім'я", "Telegram Handle", "Графік", "Статус"]];
     for (var i = 0; i < operators.length; i++) {
       var op = operators[i];
       output.push([
         op.id,
         op.name || '',
         op.tag || '',
+        op.schedule || '',
         op.status || (op.dismissed ? 'Звільнився' : 'Активний')
       ]);
     }
-    sheet.getRange(1, 1, output.length, 4).setValues(output);
+    sheet.getRange(1, 1, output.length, 5).setValues(output);
     return ContentService.createTextOutput(JSON.stringify({ status: "success", count: operators.length }))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
@@ -1722,7 +1724,7 @@ function doPost(e) {
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.26</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.27</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
