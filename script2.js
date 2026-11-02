@@ -820,12 +820,22 @@ function toggleBreakMenu(id, event) {
 
     document.querySelectorAll('.break-menu-popover').forEach(p => p.remove());
 
+    const wrapRect = wrap.getBoundingClientRect();
+    const alignLeft = wrapRect.left < 250;
+
     const now = new Date();
     const curH = String(now.getHours()).padStart(2, '0');
     const curM = String(now.getMinutes()).padStart(2, '0');
 
     const popover = document.createElement('div');
     popover.className = 'break-menu-popover';
+    if (alignLeft) {
+        popover.style.left = '0';
+        popover.style.right = 'auto';
+    } else {
+        popover.style.left = 'auto';
+        popover.style.right = '0';
+    }
     popover.innerHTML = `
         <button type="button" class="btn-break-option" onclick="startBreak('${escapeHtml(id)}', 15 * 60, '15 хв', event)">☕️ 15 хв</button>
         <button type="button" class="btn-break-option" onclick="startBreak('${escapeHtml(id)}', 30 * 60, '30 хв', event)">☕️ 30 хв</button>
@@ -1144,7 +1154,20 @@ document.addEventListener('click', (e) => {
 });
 
 window.addEventListener('resize', () => {
-    document.querySelectorAll('.break-menu-popover').forEach(adjustPopoverPosition);
+    document.querySelectorAll('.break-menu-popover').forEach(popover => {
+        const wrap = popover.closest('.break-trigger-wrap');
+        if (wrap) {
+            const wrapRect = wrap.getBoundingClientRect();
+            if (wrapRect.left < 250) {
+                popover.style.left = '0';
+                popover.style.right = 'auto';
+            } else {
+                popover.style.left = 'auto';
+                popover.style.right = '0';
+            }
+        }
+        adjustPopoverPosition(popover);
+    });
 });
 
 // Форс-мажори (Outage Toggle)
@@ -1518,6 +1541,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.19",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Абсолютне запобігання виходу меню перерви за межі екрана: реалізовано спрямоване відкриття вправо (left: 0) для лівих карток, прибрано затримки переходів та впроваджено миттєве авто-вирівнювання у видимій області." }
+        ]
+    },
     {
         version: "1.4.18",
         date: "2026-11-02",

@@ -712,9 +712,9 @@
             flex-direction: column;
             z-index: 120;
             width: 250px;
+            box-sizing: border-box;
             max-width: calc(100vw - 24px);
             overflow: hidden;
-            transition: transform 0.15s ease-out;
         }
         input[type="number"]::-webkit-outer-spin-button,
         input[type="number"]::-webkit-inner-spin-button {
@@ -1103,7 +1103,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.18
+    <span class="badge-dot"></span> v1.4.19
 </div>
 
 <div class="container">
@@ -1195,7 +1195,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.18</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.19</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
