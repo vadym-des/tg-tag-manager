@@ -598,13 +598,54 @@ function parseOperatorInputTokens(input) {
         }
     }
 
-    // 6. Extra / Part-time pattern: (1), [1], 1(дод), (1 дод), 1(доп), 1(додатковий)
-    const extraRegex = /(?:(?:\(\s*(\d+)\s*\)|\[\s*(\d+)\s*\])|(?:(\()?\s*(\d+)\s*(?:\(|\s*)\s*(?:дод|додатковий|додаткова|доп|ext|extra)\s*\)?\)?))/gi;
-    while ((match = extraRegex.exec(input)) !== null) {
+    // 6. Extra / Part-time pattern:
+    // 6a. Single/Multi operator bracket groups: (1), [1], (73,32), (73, 32), [73, 32, 105]
+    const bracketGroupRegex = /(?:\(([^)]+)\)|\[([^\]]+)\])/g;
+    while ((match = bracketGroupRegex.exec(input)) !== null) {
+        const groupStart = match.index;
+        const groupEnd = bracketGroupRegex.lastIndex;
+        const innerContent = match[1] || match[2] || '';
+
+        // Пропускаємо, якщо цей діапазон уже зайнято лідом або форс-мажором
+        if (checkOverlap(groupStart, groupEnd)) continue;
+
+        // Шукаємо всі ID операторів всередині дужок
+        const innerDigitsRegex = /\d+/g;
+        let dMatch;
+        const foundDigits = [];
+        while ((dMatch = innerDigitsRegex.exec(innerContent)) !== null) {
+            foundDigits.push({
+                id: dMatch[0],
+                start: groupStart + 1 + dMatch.index,
+                end: groupStart + 1 + dMatch.index + dMatch[0].length
+            });
+        }
+
+        if (foundDigits.length > 0) {
+            for (const d of foundDigits) {
+                processedRanges.push({
+                    start: d.start,
+                    end: d.end,
+                    id: d.id,
+                    isExtra: true
+                });
+            }
+            // Блокуємо весь діапазон дужок від звичайного пошуку цифр
+            processedRanges.push({
+                start: groupStart,
+                end: groupEnd,
+                id: '__bracket_group__'
+            });
+        }
+    }
+
+    // 6b. Explicit "дод" / "додатковий" suffix or prefix: 1(дод), 1 дод, 1дод, 1(доп)
+    const extraExplicitRegex = /(?:(\()?\s*(\d+)\s*(?:\(|\s*)\s*(?:дод|додатковий|додаткова|доп|ext|extra)\s*\)?\)?)/gi;
+    while ((match = extraExplicitRegex.exec(input)) !== null) {
         const start = match.index;
-        const end = extraRegex.lastIndex;
+        const end = extraExplicitRegex.lastIndex;
         if (!checkOverlap(start, end)) {
-            const id = match[1] || match[2] || match[4];
+            const id = match[2];
             if (id) {
                 processedRanges.push({
                     start,
@@ -638,6 +679,7 @@ function parseOperatorInputTokens(input) {
     const seenIds = new Set();
     const result = [];
     for (const item of processedRanges) {
+        if (item.id === '__bracket_group__') continue;
         if (!seenIds.has(item.id)) {
             seenIds.add(item.id);
             result.push({
@@ -2067,6 +2109,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.24",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Підтримка декількох додаткових операторів у дужках: коли введено групу операторів у круглих або квадратних дужках (наприклад (73,32), [73, 32], (73, 32, 105)), кожен з них автоматично позначається як додатковий вихід (бейдж «⏱ Додатковий (до 11-12:00)», мітка «⏱ дод» та виділена рамка)." }
+        ]
+    },
     {
         version: "1.4.23",
         date: "2026-11-02",
