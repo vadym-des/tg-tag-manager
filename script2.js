@@ -1993,6 +1993,34 @@ function initCloudSyncStatus() {
     }
 }
 
+// Меню бази даних (Варіант 1)
+function toggleDbMenu(event) {
+    if (event) event.stopPropagation();
+    const menu = document.getElementById('dbDropdownMenu');
+    const btn = document.getElementById('btnDbMenuToggle');
+    if (!menu) return;
+    const isOpen = menu.classList.contains('show');
+    if (isOpen) {
+        closeDbMenu();
+    } else {
+        menu.classList.add('show');
+        if (btn) btn.classList.add('open');
+    }
+}
+
+function closeDbMenu() {
+    const menu = document.getElementById('dbDropdownMenu');
+    const btn = document.getElementById('btnDbMenuToggle');
+    if (menu) menu.classList.remove('show');
+    if (btn) btn.classList.remove('open');
+}
+
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('.db-menu-wrap')) {
+        closeDbMenu();
+    }
+});
+
 window.addEventListener('DOMContentLoaded', async () => {
     if (!localStorage.getItem('opsDB') && !localStorage.getItem('operator_db')) {
         try {
@@ -2024,10 +2052,29 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateButtonStates();
     initTemplateDate();
     initCloudSyncStatus();
+
+    const inputIds = document.getElementById('inputIds');
+    if (inputIds) {
+        inputIds.addEventListener('keydown', (e) => {
+            if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey)) || (e.key === 'Enter' && !e.shiftKey)) {
+                e.preventDefault();
+                processInput();
+            }
+        });
+    }
+
     processInput();
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.23",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Оптимізація та редизайн інтерфейсу (Варіант 1: «Мінімалістичний фокус»): замість 6 різнокольорових кнопок впроваджено одну велику кнопку «⚡️ Обробити номери» та компактне стильне меню «⚙️ База ▾» із швидким доступом до редагування, хмари, імпорту/експорту та скидання." },
+            { category: "Added", text: "Підтримка клавіші Enter у полі введення номерів: швидкий запуск обробки карток без необхідності щоразу тягнутися мишкою до кнопки." }
+        ]
+    },
     {
         version: "1.4.22",
         date: "2026-11-02",

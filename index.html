@@ -90,6 +90,134 @@
             gap: 8px;
             margin-top: 10px;
         }
+
+        /* Main Actions Bar (Variant 1: Minimalist Focus) */
+        .main-actions-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            position: relative;
+        }
+        .btn-process-main {
+            flex: 1;
+            min-height: 44px;
+            background: var(--tg-accent);
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 14px rgba(46, 166, 255, 0.28);
+            transition: transform 0.15s, background-color 0.2s, box-shadow 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-process-main:hover {
+            background: #1b8adb;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(46, 166, 255, 0.38);
+        }
+        .btn-process-main:active {
+            transform: translateY(0);
+        }
+        .db-menu-wrap {
+            position: relative;
+            display: inline-flex;
+        }
+        .btn-db-menu {
+            min-height: 44px;
+            padding: 0 16px;
+            background: var(--tg-card);
+            color: var(--tg-text);
+            border: 1px solid var(--tg-border);
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.15s, border-color 0.15s, transform 0.1s;
+            white-space: nowrap;
+        }
+        .btn-db-menu:hover {
+            background: var(--tg-card-hover);
+            border-color: var(--tg-accent);
+            transform: translateY(-1px);
+        }
+        .btn-db-menu .menu-arrow {
+            font-size: 10px;
+            color: var(--tg-text-muted);
+            transition: transform 0.2s ease;
+        }
+        .btn-db-menu.open .menu-arrow {
+            transform: rotate(180deg);
+        }
+        .db-dropdown-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 250px;
+            background: var(--tg-card);
+            border: 1px solid var(--tg-border);
+            border-radius: 12px;
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+            padding: 6px;
+            z-index: 150;
+            backdrop-filter: blur(10px);
+        }
+        .db-dropdown-menu.show {
+            display: flex;
+            flex-direction: column;
+            animation: fadeInDbMenu 0.15s ease-out;
+        }
+        @keyframes fadeInDbMenu {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .db-menu-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border: none;
+            background: transparent;
+            color: var(--tg-text);
+            font-size: 13px;
+            font-weight: 500;
+            text-align: left;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.15s;
+            width: 100%;
+        }
+        .db-menu-item:hover {
+            background: var(--tg-card-hover);
+        }
+        .db-menu-icon {
+            font-size: 15px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+        }
+        .db-menu-divider {
+            height: 1px;
+            background: var(--tg-border);
+            margin: 4px 6px;
+        }
+        .db-menu-danger {
+            color: #ef4444;
+        }
+        .db-menu-danger:hover {
+            background: rgba(239, 68, 68, 0.12);
+        }
         button {
             background: var(--tg-accent);
             color: #ffffff;
@@ -1338,7 +1466,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.22
+    <span class="badge-dot"></span> v1.4.23
 </div>
 
 <div id="cloudSyncBadge" class="sync-status-badge" onclick="toggleCloudModal()" title="Статус хмарної синхронізації з Google Sheets">
@@ -1347,16 +1475,36 @@
 
 <div class="container">
     <h2>Telegram Tag Manager</h2>
-    <textarea id="inputIds" placeholder="Введіть номери: 1, (31), 60"></textarea>
+    <textarea id="inputIds" placeholder="Введіть номери: 1, (31), 60 (Enter для швидкої обробки)"></textarea>
     
-    <div class="controls-grid">
-        <button id="btnProcess" onclick="processInput()">Process IDs</button>
-        <button id="btnCloudSync" type="button" onclick="toggleCloudModal()" class="btn-cloud" title="Синхронізація з Google Sheets">☁️ Google Sheets</button>
-        <button id="btnImport" onclick="document.getElementById('fileImporter').click()" class="btn-import">Import Base (Excel/JSON)</button>
-        <button id="btnExport" type="button" onclick="exportDbToExcel()" class="btn-export">Export Base (Excel)</button>
+    <div class="main-actions-bar">
+        <button id="btnProcess" onclick="processInput()" class="btn-process-main" title="Обробити введені номери (Enter)">
+            ⚡️ Обробити номери
+        </button>
+        <div class="db-menu-wrap">
+            <button id="btnDbMenuToggle" type="button" onclick="toggleDbMenu(event)" class="btn-db-menu" title="Управління базою операторів">
+                ⚙️ База <span class="menu-arrow">▾</span>
+            </button>
+            <div id="dbDropdownMenu" class="db-dropdown-menu">
+                <button type="button" class="db-menu-item" onclick="toggleModal(); closeDbMenu();">
+                    <span class="db-menu-icon">✏️</span> Редагувати базу (Edit Base)
+                </button>
+                <button type="button" class="db-menu-item" onclick="toggleCloudModal(); closeDbMenu();">
+                    <span class="db-menu-icon">☁️</span> Google Sheets (Хмара)
+                </button>
+                <button type="button" class="db-menu-item" onclick="document.getElementById('fileImporter').click(); closeDbMenu();">
+                    <span class="db-menu-icon">📥</span> Імпорт Excel / JSON
+                </button>
+                <button type="button" class="db-menu-item" onclick="exportDbToExcel(); closeDbMenu();">
+                    <span class="db-menu-icon">📤</span> Експорт Excel
+                </button>
+                <div class="db-menu-divider"></div>
+                <button type="button" class="db-menu-item db-menu-danger" onclick="clearCache(); closeDbMenu();">
+                    <span class="db-menu-icon">🗑</span> Скинути все (Reset All)
+                </button>
+            </div>
+        </div>
         <input type="file" id="fileImporter" accept=".xlsx, .xls, .json" style="display:none;" onchange="handleFileImport(event)">
-        <button id="btnEdit" onclick="toggleModal()" class="btn-secondary">Edit Base</button>
-        <button id="btnReset" onclick="clearCache()" class="btn-danger">Reset All</button>
     </div>
 
     <div id="opCounter">Вибрано: 0</div>
@@ -1565,7 +1713,7 @@ function doPost(e) {
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.22</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.23</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
