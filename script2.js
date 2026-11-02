@@ -24,7 +24,8 @@ function loadDB() {
                 const tag = op.handle || op.tag || '';
                 const name = sanitizeName(op.name, id);
                 const history = Array.isArray(op.history) ? op.history.filter(h => h && typeof h === 'object') : [];
-                sanitized[id] = { name, tag, handle: tag, history };
+                const status = op.status === 'dismissed' ? 'dismissed' : (op.status === 'active' ? 'active' : (isDismissed(op) ? 'dismissed' : 'active'));
+                sanitized[id] = { name, tag, handle: tag, status, history };
             }
         }
         return sanitized;
@@ -58,6 +59,8 @@ function updateButtonStates() {
 }
 
 function isDismissed(item) {
+    if (item?.status === 'dismissed') return true;
+    if (item?.status === 'active') return false;
     return String(item?.name || '').trim().toLowerCase().includes('звільн');
 }
 
@@ -96,6 +99,7 @@ function toggleModal() {
             id: String(id),
             name: sanitizeName(db[id]?.name, id),
             tag: db[id]?.tag || db[id]?.handle || '',
+            status: db[id]?.status || (isDismissed(db[id]) ? 'dismissed' : 'active'),
             history: Array.isArray(db[id]?.history) ? [...db[id].history] : []
         }));
         
@@ -125,10 +129,12 @@ function syncEditingDbFromDom() {
             const idInput = row.querySelector('.row-id');
             const nameInput = row.querySelector('.row-name');
             const handleInput = row.querySelector('.row-handle');
+            const statusSelect = row.querySelector('.row-status');
 
             if (idInput) editingDbList[origIdx].id = idInput.value;
             if (nameInput) editingDbList[origIdx].name = nameInput.value;
             if (handleInput) editingDbList[origIdx].tag = handleInput.value;
+            if (statusSelect) editingDbList[origIdx].status = statusSelect.value;
         }
     });
 }
@@ -189,13 +195,30 @@ function renderDbTableRows() {
             <input type="text" class="row-name" placeholder="Ім'я" value="${escapeHtml(item.name)}" title="Ім'я оператора">
             <input type="text" class="row-handle" placeholder="@тег" value="${escapeHtml(item.tag)}" title="Telegram-тег">
             <div class="status-col" style="display:flex; align-items:center; justify-content:center; gap:4px;">
-                <span class="status-badge ${statusClass}">${statusLabel}</span>
+                <select class="row-status status-select ${statusClass}" onchange="onDbRowStatusChange(this, ${originalIndex})" title="Змінити статус оператора: Активний / Звільнився">
+                    <option value="active" ${!dismissed ? 'selected' : ''}>Активний</option>
+                    <option value="dismissed" ${dismissed ? 'selected' : ''}>Звільнився</option>
+                </select>
                 ${historyCount > 0 ? `<span style="font-size:11px; cursor:help; color:var(--tg-text-muted);" title="${escapeHtml(historyTooltip)}">📜${historyCount}</span>` : ''}
             </div>
             <button type="button" class="btn-del" title="Видалити" onclick="deleteDbRow(${originalIndex})">✕</button>
         `;
         container.appendChild(row);
     });
+}
+
+function onDbRowStatusChange(selectElem, originalIndex) {
+    if (!selectElem || isNaN(originalIndex) || !editingDbList[originalIndex]) return;
+    const newStatus = selectElem.value;
+    editingDbList[originalIndex].status = newStatus;
+
+    if (newStatus === 'dismissed') {
+        selectElem.classList.remove('active');
+        selectElem.classList.add('dismissed');
+    } else {
+        selectElem.classList.remove('dismissed');
+        selectElem.classList.add('active');
+    }
 }
 
 function addNewDbRow() {
@@ -214,6 +237,7 @@ function addNewDbRow() {
         id: nextId,
         name: '',
         tag: '',
+        status: dbStatusFilter === 'dismissed' ? 'dismissed' : 'active',
         history: []
     };
 
@@ -304,16 +328,18 @@ function saveInteractiveDB() {
 
         seenIds.add(cleanId);
 
+        const status = item.status === 'dismissed' ? 'dismissed' : (item.status === 'active' ? 'active' : (isDismissed(item) ? 'dismissed' : 'active'));
+
         // Фіксація історії при зміні або перевидачі ID іншому оператору
         const oldOp = db[cleanId];
         let history = Array.isArray(item.history) ? [...item.history] : (oldOp && Array.isArray(oldOp.history) ? [...oldOp.history] : []);
 
-        if (oldOp && (oldOp.name !== cleanName || oldOp.tag !== cleanTag)) {
-            const wasDismissed = isDismissed(oldOp);
+        const oldStatus = oldOp ? (oldOp.status || (isDismissed(oldOp) ? 'dismissed' : 'active')) : 'active';
+        if (oldOp && (oldOp.name !== cleanName || oldOp.tag !== cleanTag || oldStatus !== status)) {
             history.push({
                 name: oldOp.name || '',
                 tag: oldOp.tag || oldOp.handle || '',
-                status: wasDismissed ? 'dismissed' : 'active',
+                status: oldStatus,
                 archivedAt: new Date().toISOString().slice(0, 10)
             });
         }
@@ -322,6 +348,7 @@ function saveInteractiveDB() {
             name: cleanName,
             tag: cleanTag,
             handle: cleanTag,
+            status,
             history
         };
     }
@@ -362,7 +389,9 @@ function handleFileImport(event) {
                             const cleanId = String(id).trim();
                             if (cleanId === '41' && tag === '@maria63') tag = '@mariiia63';
                             const name = sanitizeName(rawName, cleanId);
-                            importedDB[cleanId] = { name, tag, handle: tag };
+                            const status = item.status === 'dismissed' ? 'dismissed' : (item.status === 'active' ? 'active' : (rawName && String(rawName).toLowerCase().includes('звільн') ? 'dismissed' : 'active'));
+                            const history = Array.isArray(item.history) ? item.history : [];
+                            importedDB[cleanId] = { name, tag, handle: tag, status, history };
                         }
                     });
                 } else if (parsed && typeof parsed === 'object') {
@@ -375,8 +404,10 @@ function handleFileImport(event) {
                             if (cleanId === '41' && tag === '@maria63') tag = '@mariiia63';
                             const rawName = val.name || val['ім\'я'] || val['имя'] || val['піб'];
                             const name = sanitizeName(rawName, cleanId);
+                            const status = val.status === 'dismissed' ? 'dismissed' : (val.status === 'active' ? 'active' : (rawName && String(rawName).toLowerCase().includes('звільн') ? 'dismissed' : 'active'));
+                            const history = Array.isArray(val.history) ? val.history : [];
                             if (tag) {
-                                importedDB[cleanId] = { name, tag, handle: tag };
+                                importedDB[cleanId] = { name, tag, handle: tag, status, history };
                             }
                         }
                     }
@@ -425,6 +456,7 @@ function handleFileImport(event) {
                     let idVal = null;
                     let tagVal = null;
                     let nameVal = null;
+                    let statusVal = null;
 
                     for (const key of Object.keys(row)) {
                         const cleanKey = key.trim();
@@ -434,6 +466,8 @@ function handleFileImport(event) {
                             tagVal = row[key];
                         } else if (/(ім'я|имя|name|піб|оператор|співробітник|працівник|прізвище|хто)/i.test(cleanKey) && nameVal === null) {
                             nameVal = row[key];
+                        } else if (/(статус|status)/i.test(cleanKey) && statusVal === null) {
+                            statusVal = row[key];
                         }
                     }
 
@@ -443,8 +477,9 @@ function handleFileImport(event) {
                         if (!tag.startsWith('@')) tag = '@' + tag;
                         if (id === '41' && tag === '@maria63') tag = '@mariiia63';
                         const name = sanitizeName(nameVal, id);
+                        const status = statusVal ? (String(statusVal).toLowerCase().includes('звільн') ? 'dismissed' : 'active') : (nameVal && String(nameVal).toLowerCase().includes('звільн') ? 'dismissed' : 'active');
                         if (id) {
-                            importedDB[id] = { name, tag, handle: tag };
+                            importedDB[id] = { name, tag, handle: tag, status };
                         }
                     }
                 });
@@ -759,6 +794,13 @@ function toggleBreakMenu(id, event) {
     `;
 
     wrap.appendChild(popover);
+
+    setTimeout(() => {
+        const rect = popover.getBoundingClientRect();
+        if (rect.bottom > window.innerHeight) {
+            popover.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }, 10);
 }
 
 function startCustomBreak(id, event) {
@@ -1281,7 +1323,8 @@ window.addEventListener('DOMContentLoaded', async () => {
                             const tag = op.handle || op.tag || '';
                             const name = sanitizeName(op.name, id);
                             const history = Array.isArray(op.history) ? op.history : [];
-                            sanitized[id] = { name, tag, handle: tag, history };
+                            const status = op.status || (isDismissed(op) ? 'dismissed' : 'active');
+                            sanitized[id] = { name, tag, handle: tag, status, history };
                         }
                     }
                     if (Object.keys(sanitized).length > 0) {
@@ -1300,6 +1343,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.14",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Виправлено появу внутрішнього скролбару та обрізання спливаючого меню перерви: сітка карток тепер природно розширюється вниз без блокування висоти." },
+            { category: "Added", text: "Інтерактивний ручний вибір статусу оператора (Активний / Звільнився) у модальному вікні редагування бази через клікабельний селект." },
+            { category: "Added", text: "Збереження обраного статусу в базі та синхронізація з фільтрами й експортом." }
+        ]
+    },
     {
         version: "1.4.13",
         date: "2026-10-04",
