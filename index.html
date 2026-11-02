@@ -342,21 +342,24 @@
         .card-title {
             color: var(--tg-text);
             font-size: 14px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+            min-width: 0;
             flex: 1;
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 4px;
             line-height: 1.2;
         }
         .card-title strong {
             font-weight: 600;
+            flex-shrink: 0;
         }
         .card-name {
             font-weight: 500;
             color: var(--tg-text);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
         }
         .lead-crown-icon {
             display: inline-flex;
@@ -366,6 +369,7 @@
             line-height: 1;
             transform: translateY(-1px);
             filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.5));
+            flex-shrink: 0;
         }
         .card-footer-row {
             display: flex;
@@ -882,7 +886,9 @@
             background: rgba(244, 114, 182, 0.2);
             color: #f472b6;
             border: 1px solid rgba(244, 114, 182, 0.4);
-            margin-left: 4px;
+            margin-left: auto;
+            flex-shrink: 0;
+            white-space: nowrap;
             vertical-align: middle;
             user-select: none;
         }
@@ -1469,7 +1475,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.25
+    <span class="badge-dot"></span> v1.4.26
 </div>
 
 <div id="cloudSyncBadge" class="sync-status-badge" onclick="toggleCloudModal()" title="Статус хмарної синхронізації з Google Sheets">
@@ -1716,7 +1722,7 @@ function doPost(e) {
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.25</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.26</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
