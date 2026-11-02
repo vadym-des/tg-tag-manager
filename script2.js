@@ -23,9 +23,10 @@ function loadDB() {
             if (op && typeof op === 'object') {
                 const tag = op.handle || op.tag || '';
                 const name = sanitizeName(op.name, id);
+                const schedule = (op.schedule || '').trim();
                 const history = Array.isArray(op.history) ? op.history.filter(h => h && typeof h === 'object') : [];
                 const status = op.status === 'dismissed' ? 'dismissed' : (op.status === 'active' ? 'active' : (isDismissed(op) ? 'dismissed' : 'active'));
-                sanitized[id] = { name, tag, handle: tag, status, history };
+                sanitized[id] = { name, tag, handle: tag, schedule, status, history };
             }
         }
         return sanitized;
@@ -99,6 +100,7 @@ function toggleModal() {
             id: String(id),
             name: sanitizeName(db[id]?.name, id),
             tag: db[id]?.tag || db[id]?.handle || '',
+            schedule: db[id]?.schedule || '',
             status: db[id]?.status || (isDismissed(db[id]) ? 'dismissed' : 'active'),
             history: Array.isArray(db[id]?.history) ? [...db[id].history] : []
         }));
@@ -129,11 +131,13 @@ function syncEditingDbFromDom() {
             const idInput = row.querySelector('.row-id');
             const nameInput = row.querySelector('.row-name');
             const handleInput = row.querySelector('.row-handle');
+            const scheduleInput = row.querySelector('.row-schedule');
             const statusSelect = row.querySelector('.row-status');
 
             if (idInput) editingDbList[origIdx].id = idInput.value;
             if (nameInput) editingDbList[origIdx].name = nameInput.value;
             if (handleInput) editingDbList[origIdx].tag = handleInput.value;
+            if (scheduleInput) editingDbList[origIdx].schedule = scheduleInput.value;
             if (statusSelect) editingDbList[origIdx].status = statusSelect.value;
         }
     });
@@ -194,6 +198,7 @@ function renderDbTableRows() {
             <input type="text" class="row-id" placeholder="ID" value="${escapeHtml(item.id)}" title="Номер ID">
             <input type="text" class="row-name" placeholder="Ім'я" value="${escapeHtml(item.name)}" title="Ім'я оператора">
             <input type="text" class="row-handle" placeholder="@тег" value="${escapeHtml(item.tag)}" title="Telegram-тег">
+            <input type="text" class="row-schedule" placeholder="Графік (до 16:00)" value="${escapeHtml(item.schedule || '')}" title="Графік роботи оператора (наприклад: до 16:00, 9-18, 9-21, 5/2)">
             <div class="status-col" style="display:flex; align-items:center; justify-content:center; gap:4px;">
                 <select class="row-status status-select ${statusClass}" onchange="onDbRowStatusChange(this, ${originalIndex})" title="Змінити статус оператора: Активний / Звільнився">
                     <option value="active" ${!dismissed ? 'selected' : ''}>Активний</option>
@@ -237,6 +242,7 @@ function addNewDbRow() {
         id: nextId,
         name: '',
         tag: '',
+        schedule: '',
         status: dbStatusFilter === 'dismissed' ? 'dismissed' : 'active',
         history: []
     };
@@ -344,10 +350,13 @@ function saveInteractiveDB() {
             });
         }
 
+        const cleanSchedule = (item.schedule || '').trim();
+
         newDb[cleanId] = {
             name: cleanName,
             tag: cleanTag,
             handle: cleanTag,
+            schedule: cleanSchedule,
             status,
             history
         };
@@ -384,15 +393,17 @@ function handleFileImport(event) {
                         const id = item.id || item.idVal || item['№ оп'] || item['номер'] || item['оп'];
                         const rawTag = item.tag || item.handle || item.telegram || item['тег'] || item['нік'];
                         const rawName = item.name || item['ім\'я'] || item['имя'] || item['піб'] || item['оператор'];
+                        const rawSchedule = item.schedule || item['графік'] || item['график'] || '';
                         if (id && rawTag) {
                             let tag = String(rawTag).trim();
                             if (!tag.startsWith('@')) tag = '@' + tag;
                             const cleanId = String(id).trim();
                             if (cleanId === '41' && tag === '@maria63') tag = '@mariiia63';
                             const name = sanitizeName(rawName, cleanId);
+                            const schedule = String(rawSchedule || '').trim();
                             const status = item.status === 'dismissed' ? 'dismissed' : (item.status === 'active' ? 'active' : (rawName && String(rawName).toLowerCase().includes('звільн') ? 'dismissed' : 'active'));
                             const history = Array.isArray(item.history) ? item.history : [];
-                            importedDB[cleanId] = { name, tag, handle: tag, status, history };
+                            importedDB[cleanId] = { name, tag, handle: tag, schedule, status, history };
                         }
                     });
                 } else if (parsed && typeof parsed === 'object') {
@@ -405,10 +416,11 @@ function handleFileImport(event) {
                             if (cleanId === '41' && tag === '@maria63') tag = '@mariiia63';
                             const rawName = val.name || val['ім\'я'] || val['имя'] || val['піб'];
                             const name = sanitizeName(rawName, cleanId);
+                            const schedule = String(val.schedule || val['графік'] || val['график'] || '').trim();
                             const status = val.status === 'dismissed' ? 'dismissed' : (val.status === 'active' ? 'active' : (rawName && String(rawName).toLowerCase().includes('звільн') ? 'dismissed' : 'active'));
                             const history = Array.isArray(val.history) ? val.history : [];
                             if (tag) {
-                                importedDB[cleanId] = { name, tag, handle: tag, status, history };
+                                importedDB[cleanId] = { name, tag, handle: tag, schedule, status, history };
                             }
                         }
                     }
@@ -458,6 +470,7 @@ function handleFileImport(event) {
                     let tagVal = null;
                     let nameVal = null;
                     let statusVal = null;
+                    let scheduleVal = null;
 
                     for (const key of Object.keys(row)) {
                         const cleanKey = key.trim();
@@ -469,6 +482,8 @@ function handleFileImport(event) {
                             nameVal = row[key];
                         } else if (/(статус|status)/i.test(cleanKey) && statusVal === null) {
                             statusVal = row[key];
+                        } else if (/(графік|график|schedule|годин|зміна|смена)/i.test(cleanKey) && scheduleVal === null) {
+                            scheduleVal = row[key];
                         }
                     }
 
@@ -478,9 +493,10 @@ function handleFileImport(event) {
                         if (!tag.startsWith('@')) tag = '@' + tag;
                         if (id === '41' && tag === '@maria63') tag = '@mariiia63';
                         const name = sanitizeName(nameVal, id);
+                        const schedule = scheduleVal ? String(scheduleVal).trim() : '';
                         const status = statusVal ? (String(statusVal).toLowerCase().includes('звільн') ? 'dismissed' : 'active') : (nameVal && String(nameVal).toLowerCase().includes('звільн') ? 'dismissed' : 'active');
                         if (id) {
-                            importedDB[id] = { name, tag, handle: tag, status };
+                            importedDB[id] = { name, tag, handle: tag, schedule, status };
                         }
                     }
                 });
@@ -696,6 +712,49 @@ function parseOperatorInputTokens(input) {
     return result;
 }
 
+// Допоміжна функція розбору графіку роботи оператора
+function parseScheduleEnd(str) {
+    if (!str || typeof str !== 'string') return null;
+    const trimmed = str.trim();
+    if (!trimmed) return null;
+
+    // Патерн 1: "до 16:00", "до 16", "до 4", "до 4-ї", "до 16.00"
+    const untilMatch = trimmed.match(/до\s*(\d{1,2})(?:[:\.](\d{2}))?(?:\s*(?:-[їі]|ї|і))?/i);
+    if (untilMatch) {
+        let hour = parseInt(untilMatch[1], 10);
+        const min = untilMatch[2] ? parseInt(untilMatch[2], 10) : 0;
+        // Якщо вказано "до 4" або "до 4-ї" чи "до 5", конвертуємо в 24-годинний формат (16:00, 17:00)
+        if (hour >= 1 && hour <= 6) {
+            hour += 12;
+        }
+        return { hour, min, label: `до ${hour}:${String(min).padStart(2, '0')}` };
+    }
+
+    // Патерн 2: діапазон "9-16", "9:00 - 16:00", "9 - 18", "10-21"
+    const rangeMatch = trimmed.match(/\b\d{1,2}(?::\d{2})?\s*[-–—]\s*(\d{1,2})(?::(\d{2}))?\b/);
+    if (rangeMatch) {
+        let hour = parseInt(rangeMatch[1], 10);
+        const min = rangeMatch[2] ? parseInt(rangeMatch[2], 10) : 0;
+        if (hour >= 1 && hour <= 6) {
+            hour += 12;
+        }
+        return { hour, min, label: `до ${hour}:${String(min).padStart(2, '0')}` };
+    }
+
+    // Патерн 3: прямий час "16:00", "18:00"
+    const exactMatch = trimmed.match(/\b(\d{1,2}):(\d{2})\b/);
+    if (exactMatch) {
+        let hour = parseInt(exactMatch[1], 10);
+        const min = parseInt(exactMatch[2], 10);
+        if (hour >= 1 && hour <= 6) {
+            hour += 12;
+        }
+        return { hour, min, label: `до ${hour}:${String(min).padStart(2, '0')}` };
+    }
+
+    return null;
+}
+
 // Логіка роботи
 function processInput() {
     updateButtonStates();
@@ -764,6 +823,29 @@ function processInput() {
                     div.style.borderColor = 'rgba(245, 158, 11, 0.6)';
                 } else {
                     badgesHtml += `<span class="badge-role badge-info">🕒 До ${escapeHtml(timeStr)}</span>`;
+                }
+            } else if (!item.isExtra && op.schedule) {
+                // Індивідуальний графік з бази оператора (якщо не вказано окремо в тексті та не є додатковим у дужках)
+                const schedInfo = parseScheduleEnd(op.schedule);
+                if (schedInfo) {
+                    const now = new Date();
+                    const shiftEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), schedInfo.hour, schedInfo.min || 0, 0);
+                    const diffMinutes = (shiftEnd.getTime() - now.getTime()) / (1000 * 60);
+                    const timeStr = `${schedInfo.hour}:${String(schedInfo.min).padStart(2, '0')}`;
+
+                    if (diffMinutes <= 0) {
+                        isChecked = false;
+                        badgesHtml += `<span class="badge-role badge-expired" title="Графік: ${escapeHtml(op.schedule)}">⏳ Зміна закінчилась (до ${escapeHtml(timeStr)})</span>`;
+                        div.style.opacity = '0.65';
+                    } else if (diffMinutes <= 45) {
+                        badgesHtml += `<span class="badge-role badge-warning" title="Графік: ${escapeHtml(op.schedule)}">⚠️ Скоро кінець зміни (до ${escapeHtml(timeStr)})</span>`;
+                        div.style.borderColor = 'rgba(245, 158, 11, 0.6)';
+                    } else {
+                        badgesHtml += `<span class="badge-role badge-info" title="Графік: ${escapeHtml(op.schedule)}">🕒 Графік: до ${escapeHtml(timeStr)}</span>`;
+                    }
+                } else {
+                    // Текстовий опис графіку без точного числового часу (наприклад "5/2" або "2/2")
+                    badgesHtml += `<span class="badge-role badge-info" style="opacity:0.85;" title="Графік оператора">🕒 ${escapeHtml(op.schedule)}</span>`;
                 }
             }
 
@@ -1540,6 +1622,7 @@ function exportDbToExcel() {
             "ID": Number(id) || id,
             "Ім'я": op.name || '',
             "Telegram Handle": op.tag || op.handle || '',
+            "Графік": op.schedule || '',
             "Статус": dismissed ? "Звільнився" : "Активний"
         };
     });
@@ -1563,6 +1646,7 @@ function exportDbToExcel() {
                         "ID": Number(id) || id,
                         "Ім'я": hist.name || '',
                         "Telegram Handle": hist.tag || hist.handle || '',
+                        "Графік": hist.schedule || op.schedule || '',
                         "Статус": "Звільнився" + (hist.archivedAt ? ` (${hist.archivedAt})` : ' (історія)')
                     });
                 }
@@ -1573,7 +1657,7 @@ function exportDbToExcel() {
     dismissedRows.sort((a, b) => (parseInt(a["ID"], 10) || 0) - (parseInt(b["ID"], 10) || 0));
 
     const wb = XLSX.utils.book_new();
-    const colWidths = [{ wch: 8 }, { wch: 24 }, { wch: 22 }, { wch: 18 }];
+    const colWidths = [{ wch: 8 }, { wch: 24 }, { wch: 22 }, { wch: 16 }, { wch: 18 }];
 
     const wsAll = XLSX.utils.json_to_sheet(allRows);
     wsAll['!cols'] = colWidths;
@@ -1868,6 +1952,7 @@ function parseGvizTable(table) {
     let idIdx = cols.findIndex(c => c.includes('id') || c.includes('номер'));
     let nameIdx = cols.findIndex(c => c.includes('ім') || c.includes('name'));
     let tagIdx = cols.findIndex(c => c.includes('тег') || c.includes('handle') || c.includes('telegram'));
+    let schedIdx = cols.findIndex(c => c.includes('графік') || c.includes('график') || c.includes('schedule') || c.includes('годин'));
     let statusIdx = cols.findIndex(c => c.includes('статус') || c.includes('status'));
 
     let startRow = 0;
@@ -1876,6 +1961,7 @@ function parseGvizTable(table) {
         idIdx = firstVals.findIndex(c => c.includes('id') || c.includes('номер'));
         nameIdx = firstVals.findIndex(c => c.includes('ім') || c.includes('name'));
         tagIdx = firstVals.findIndex(c => c.includes('тег') || c.includes('handle') || c.includes('telegram'));
+        schedIdx = firstVals.findIndex(c => c.includes('графік') || c.includes('график') || c.includes('schedule') || c.includes('годин'));
         statusIdx = firstVals.findIndex(c => c.includes('статус') || c.includes('status'));
         if (idIdx !== -1) startRow = 1;
     }
@@ -1896,6 +1982,7 @@ function parseGvizTable(table) {
         let tag = r[tagIdx] && r[tagIdx].v !== undefined ? String(r[tagIdx].v).trim() : '';
         if (tag && !tag.startsWith('@')) tag = `@${tag}`;
 
+        const schedule = schedIdx !== -1 && r[schedIdx] && r[schedIdx].v !== undefined ? String(r[schedIdx].v).trim() : '';
         const rawStatus = r[statusIdx] && r[statusIdx].v !== undefined ? String(r[statusIdx].v).trim() : 'Активний';
         const isDismissed = rawStatus.toLowerCase().includes('звільн') || name.toLowerCase().includes('звільн');
 
@@ -1903,6 +1990,7 @@ function parseGvizTable(table) {
             name: name,
             tag: tag,
             handle: tag,
+            schedule: schedule,
             status: isDismissed ? 'Звільнився' : 'Активний',
             dismissed: isDismissed
         };
@@ -1943,6 +2031,7 @@ async function pushToGoogleAppsScript(scriptUrl, currentDb, onSuccess, onError) 
             id: id,
             name: item.name || '',
             tag: item.tag || item.handle || '',
+            schedule: item.schedule || '',
             status: item.status || (item.dismissed ? 'Звільнився' : 'Активний')
         });
     });
@@ -2075,9 +2164,10 @@ window.addEventListener('DOMContentLoaded', async () => {
                         if (op && typeof op === 'object') {
                             const tag = op.handle || op.tag || '';
                             const name = sanitizeName(op.name, id);
+                            const schedule = (op.schedule || '').trim();
                             const history = Array.isArray(op.history) ? op.history : [];
                             const status = op.status || (isDismissed(op) ? 'dismissed' : 'active');
-                            sanitized[id] = { name, tag, handle: tag, status, history };
+                            sanitized[id] = { name, tag, handle: tag, schedule, status, history };
                         }
                     }
                     if (Object.keys(sanitized).length > 0) {
@@ -2109,6 +2199,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.25",
+        date: "2026-11-02",
+        changes: [
+            { category: "Added", text: "Індивідуальний графік роботи оператора: у модальне вікно «Редагування бази» додано нову колонку «Графік» (наприклад «до 16:00», «9-16», «до 4» тощо)." },
+            { category: "Added", text: "Автоматичний контроль зміни при розподілі: якщо робочий час оператора згідно з його графіком минув, його картка автоматично знімається з вибору і отримує бейдж «⏳ Зміна закінчилась (до HH:MM)», що унеможливлює випадкове призначення заявок після закінчення зміни." },
+            { category: "Added", text: "Попередження про завершення зміни: за 45 хвилин до кінця зміни картка підсвічується бейджем «⚠️ Скоро кінець зміни», а в активний час показує інформаційний бейдж «🕒 Графік: до HH:MM»." },
+            { category: "Fixed", text: "Пріоритет додаткового виходу в дужках: якщо оператор з індивідуальним графіком введений у дужках (наприклад `(53)` чи `(73,32)`), він вважається додатковим виходом («⏱ Додатковий (до 11-12:00)») і залишається активним незалежно від свого базового графіку." },
+            { category: "Added", text: "Синхронізація колонки графіку: збереження та завантаження поля графіку в локальній базі, експорті/імпорті Excel та хмарній синхронізації з Google Sheets." }
+        ]
+    },
     {
         version: "1.4.24",
         date: "2026-11-02",
