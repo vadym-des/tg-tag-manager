@@ -1432,11 +1432,6 @@ function copyIgnoreTemplate() {
     }
 
     const text = generateIgnoreTemplateText();
-    const tagArea = document.getElementById('tagResult');
-    if (tagArea) {
-        tagArea.value = text;
-    }
-
     const btn = document.getElementById('btnCopyTemplate');
     const origHtml = btn ? btn.innerHTML : '';
 
@@ -1455,11 +1450,29 @@ function copyIgnoreTemplate() {
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text)
             .then(onCopySuccess)
-            .catch(() => {
-                if (tagArea) fallbackCopy(tagArea);
-            });
-    } else if (tagArea) {
-        fallbackCopy(tagArea);
+            .catch(() => fallbackCopyText(text, onCopySuccess));
+        return;
+    }
+
+    fallbackCopyText(text, onCopySuccess);
+}
+
+function fallbackCopyText(text, cb) {
+    const tempTextArea = document.createElement('textarea');
+    tempTextArea.value = text;
+    tempTextArea.style.position = 'fixed';
+    tempTextArea.style.top = '-9999px';
+    tempTextArea.style.left = '-9999px';
+    document.body.appendChild(tempTextArea);
+    tempTextArea.focus();
+    tempTextArea.select();
+    try {
+        const ok = document.execCommand('copy');
+        if (ok && cb) cb();
+    } catch (err) {
+        showToast('❌ Помилка копіювання');
+    } finally {
+        tempTextArea.remove();
     }
 }
 
@@ -1638,6 +1651,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.21",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Збереження чистого списку тегів: копіювання шаблону ігнорів більше не перезаписує нижнє текстове поле з тегами операторів, залишаючи його незмінним, а шаблон копіюється виключно в буфер обміну." }
+        ]
+    },
     {
         version: "1.4.20",
         date: "2026-11-02",
