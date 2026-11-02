@@ -597,7 +597,25 @@ function parseOperatorInputTokens(input) {
         }
     }
 
-    // 6. Plain ID pattern: match any remaining digits
+    // 6. Extra / Part-time pattern: (1), [1], 1(дод), (1 дод), 1(доп), 1(додатковий)
+    const extraRegex = /(?:(?:\(\s*(\d+)\s*\)|\[\s*(\d+)\s*\])|(?:(\()?\s*(\d+)\s*(?:\(|\s*)\s*(?:дод|додатковий|додаткова|доп|ext|extra)\s*\)?\)?))/gi;
+    while ((match = extraRegex.exec(input)) !== null) {
+        const start = match.index;
+        const end = extraRegex.lastIndex;
+        if (!checkOverlap(start, end)) {
+            const id = match[1] || match[2] || match[4];
+            if (id) {
+                processedRanges.push({
+                    start,
+                    end,
+                    id,
+                    isExtra: true
+                });
+            }
+        }
+    }
+
+    // 7. Plain ID pattern: match any remaining digits
     const digitRegex = /\d+/g;
     while ((match = digitRegex.exec(input)) !== null) {
         const start = match.index;
@@ -624,6 +642,7 @@ function parseOperatorInputTokens(input) {
             result.push({
                 id: item.id,
                 isLead: Boolean(item.isLead),
+                isExtra: Boolean(item.isExtra),
                 outage: item.outage || null,
                 shiftEndHour: item.shiftEndHour !== undefined ? item.shiftEndHour : null,
                 shiftEndMin: item.shiftEndMin !== undefined ? item.shiftEndMin : 0
@@ -705,13 +724,19 @@ function processInput() {
                 }
             }
 
+            if (item.isExtra) {
+                badgesHtml += `<span class="badge-role badge-extra" title="Додатковий оператор (в дужках) — зазвичай працює до 11-12:00. Будьте уважні при розподілі заявок!">⏱ Додатковий (до 11-12:00)</span>`;
+            }
+
             let cardClasses = ['card'];
             if (isChecked) cardClasses.push('active');
             if (isOutage) cardClasses.push('is-outage');
+            if (item.isExtra) cardClasses.push('is-extra');
             div.className = cardClasses.join(' ');
             div.dataset.outage = outageType;
             div.dataset.opId = id;
             div.dataset.isLead = item.isLead ? 'true' : 'false';
+            div.dataset.isExtra = item.isExtra ? 'true' : 'false';
 
             let toggleBtnIcon = '⚡️';
             let toggleBtnStyle = '';
@@ -722,7 +747,7 @@ function processInput() {
             div.innerHTML = `
                 <div class="card-header-row">
                     <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('active', this.checked); updateTags()">
-                    <span class="card-title"><strong>Оп ${escapeHtml(id)}</strong>${name ? ` <span class="card-name">— ${escapeHtml(name)}</span>` : ''}${item.isLead ? ` <span class="lead-crown-icon" title="Головний бази">👑</span>` : ''}</span>
+                    <span class="card-title"><strong>Оп ${escapeHtml(id)}</strong>${name ? ` <span class="card-name">— ${escapeHtml(name)}</span>` : ''}${item.isLead ? ` <span class="lead-crown-icon" title="Головний бази">👑</span>` : ''}${item.isExtra ? ` <span class="extra-pill-icon" title="Додатковий оператор (зазвичай до 11-12:00)">⏱ дод</span>` : ''}</span>
                 </div>
                 <div class="card-footer-row">
                     <div class="card-subtitle">${escapeHtml(tag)}</div>
@@ -1472,6 +1497,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.17",
+        date: "2026-11-02",
+        changes: [
+            { category: "Added", text: "Автоматичне розпізнавання додаткових операторів у дужках, наприклад (1) або [1]: яскравий бейдж «⏱ Додатковий (до 11-12:00)», мітка «⏱ дод» у заголовку картки та акцентна рамка для обережного розподілу заявок." }
+        ]
+    },
     {
         version: "1.4.16",
         date: "2026-11-02",

@@ -630,6 +630,32 @@
             color: #9ca3af;
             border: 1px solid rgba(107, 114, 128, 0.4);
         }
+        .badge-extra {
+            background: rgba(244, 114, 182, 0.15);
+            color: #f472b6;
+            border: 1px solid rgba(244, 114, 182, 0.35);
+        }
+        .extra-pill-icon {
+            display: inline-flex;
+            align-items: center;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 5px;
+            border-radius: 4px;
+            background: rgba(244, 114, 182, 0.2);
+            color: #f472b6;
+            border: 1px solid rgba(244, 114, 182, 0.4);
+            margin-left: 4px;
+            vertical-align: middle;
+            user-select: none;
+        }
+        .card.is-extra {
+            border-color: rgba(244, 114, 182, 0.45);
+        }
+        .card.is-extra.active {
+            border-color: rgba(244, 114, 182, 0.75);
+            box-shadow: 0 0 10px rgba(244, 114, 182, 0.15);
+        }
         .card-header-actions {
             display: flex;
             align-items: center;
@@ -1075,7 +1101,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.16
+    <span class="badge-dot"></span> v1.4.17
 </div>
 
 <div class="container">
@@ -1167,7 +1193,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.16</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.17</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
