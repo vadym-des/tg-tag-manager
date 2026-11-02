@@ -798,7 +798,6 @@ function toggleBreakMenu(id, event) {
     const now = new Date();
     const curH = String(now.getHours()).padStart(2, '0');
     const curM = String(now.getMinutes()).padStart(2, '0');
-    const defaultTimeStr = `${curH}:${curM}`;
 
     const popover = document.createElement('div');
     popover.className = 'break-menu-popover';
@@ -813,17 +812,23 @@ function toggleBreakMenu(id, event) {
             <button type="button" class="btn-custom-start" onclick="startCustomBreak('${escapeHtml(id)}', event)" title="Запустити кастомний таймер">▶</button>
         </div>
         <div class="break-retro-container" onclick="event.stopPropagation()">
-            <div class="break-retro-title">⏰ Взяв раніше (час початку):</div>
+            <div class="break-retro-title">⏰ Взяв раніше (час виходу):</div>
             <div class="break-retro-row">
-                <input type="time" id="retroTime_${escapeHtml(id)}" class="break-time-input" value="${defaultTimeStr}" title="Час коли оператор пішов на перерву">
-                <select id="retroType_${escapeHtml(id)}" class="break-type-select" title="Тривалість перерви">
-                    <option value="3600" selected>🍔 Обід 1г</option>
-                    <option value="900">☕️ 15хв</option>
-                    <option value="1800">☕️ 30хв</option>
-                    <option value="2700">☕️ 45хв</option>
+                <div class="break-time-inputs">
+                    <input type="number" id="retroHour_${escapeHtml(id)}" class="break-time-digit" value="${curH}" min="0" max="23" placeholder="год" onclick="this.select()" title="Година виходу (0-23)">
+                    <span class="break-time-colon">:</span>
+                    <input type="number" id="retroMin_${escapeHtml(id)}" class="break-time-digit" value="${curM}" min="0" max="59" placeholder="хв" onclick="this.select()" title="Хвилини виходу (0-59)">
+                </div>
+                <select id="retroType_${escapeHtml(id)}" class="break-type-select" title="Тривалість">
+                    <option value="3600" selected>🍔 Обід (1г)</option>
+                    <option value="900">☕️ 15 хв</option>
+                    <option value="1800">☕️ 30 хв</option>
+                    <option value="2700">☕️ 45 хв</option>
                 </select>
-                <button type="button" class="btn-custom-start" onclick="startRetroBreak('${escapeHtml(id)}', event)" title="Розрахувати та запустити залишок">▶</button>
             </div>
+            <button type="button" class="btn-retro-submit" onclick="startRetroBreak('${escapeHtml(id)}', event)" title="Розрахувати та запустити залишок">
+                ▶ Розрахувати та запустити
+            </button>
         </div>
     `;
 
@@ -869,18 +874,27 @@ function startRetroBreak(id, event) {
     const card = document.querySelector(`.card[data-op-id="${id}"]`);
     if (card && (card.classList.contains('is-outage') || (card.dataset.outage && card.dataset.outage !== 'none'))) return;
 
-    const timeInput = document.getElementById(`retroTime_${id}`);
+    const hourInput = document.getElementById(`retroHour_${id}`);
+    const minInput = document.getElementById(`retroMin_${id}`);
     const typeSelect = document.getElementById(`retroType_${id}`);
-    if (!timeInput || !timeInput.value) {
-        showToast('⚠️ Вкажіть час, коли оператор пішов на перерву');
+
+    if (!hourInput || !minInput || hourInput.value === '' || minInput.value === '') {
+        showToast('⚠️ Вкажіть годину та хвилини виходу');
         return;
     }
 
-    const [hoursStr, minsStr] = timeInput.value.split(':');
-    const startHour = parseInt(hoursStr, 10);
-    const startMin = parseInt(minsStr, 10);
-    if (isNaN(startHour) || isNaN(startMin)) {
-        showToast('⚠️ Некоректний формат часу');
+    let startHour = parseInt(hourInput.value, 10);
+    let startMin = parseInt(minInput.value, 10);
+
+    if (isNaN(startHour) || startHour < 0 || startHour > 23) {
+        showToast('⚠️ Некоректна година (має бути від 0 до 23)');
+        if (hourInput) hourInput.focus();
+        return;
+    }
+
+    if (isNaN(startMin) || startMin < 0 || startMin > 59) {
+        showToast('⚠️ Некоректні хвилини (має бути від 0 до 59)');
+        if (minInput) minInput.focus();
         return;
     }
 
@@ -900,10 +914,12 @@ function startRetroBreak(id, event) {
     const breakUntil = startDate.getTime() + (totalSeconds * 1000);
     const diffMs = breakUntil - Date.now();
 
+    const endDate = new Date(breakUntil);
+    const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+    const startStr = `${String(startHour).padStart(2, '0')}:${String(startMin).padStart(2, '0')}`;
+
     if (diffMs <= 0) {
-        const endDate = new Date(breakUntil);
-        const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
-        showToast(`⚠️ Вказана перерва вже закінчилась о ${endStr}!`);
+        showToast(`⚠️ Вказана перерва (${startStr} + ${Math.round(totalSeconds / 60)}хв) вже закінчилась о ${endStr}!`);
         return;
     }
 
@@ -935,10 +951,8 @@ function startRetroBreak(id, event) {
 
     checkActiveBreaks();
 
-    const endDate = new Date(breakUntil);
-    const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
     const remMins = Math.ceil(diffMs / (60 * 1000));
-    showToast(`✓ Оп ${id}: ${label} з ${timeInput.value} (до ${endStr} • залишилось ${remMins} хв)`);
+    showToast(`✓ Оп ${id}: ${label} з ${startStr} (до ${endStr} • залишилось ${remMins} хв)`);
     updateTags();
 }
 
@@ -1458,6 +1472,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.16",
+        date: "2026-11-02",
+        changes: [
+            { category: "Fixed", text: "Перероблено вибір часу початку перерви: замість незручного та обрізаного браузерного інпуту з AM/PM встановлено два великі 24-годинні поля [год] : [хв]." },
+            { category: "Added", text: "Розширено меню перерви (250px) зі збільшеними елементами управління та великою зручною кнопкою запуску перерахунку часу." }
+        ]
+    },
     {
         version: "1.4.15",
         date: "2026-11-02",

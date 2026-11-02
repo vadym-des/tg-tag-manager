@@ -680,12 +680,12 @@
             right: 0;
             background: var(--tg-card);
             border: 1px solid var(--tg-border);
-            border-radius: 8px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
             display: flex;
             flex-direction: column;
             z-index: 120;
-            width: 215px;
+            width: 250px;
             overflow: hidden;
         }
         input[type="number"]::-webkit-outer-spin-button,
@@ -701,8 +701,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            gap: 4px;
-            padding: 6px 8px;
+            gap: 6px;
+            padding: 8px 10px;
             background: rgba(15, 23, 33, 0.6);
             border-top: 1px solid var(--tg-border);
         }
@@ -710,13 +710,14 @@
             background: var(--tg-input-bg);
             border: 1px solid var(--tg-input-border);
             color: var(--tg-text);
-            border-radius: 4px;
-            padding: 4px;
-            font-size: 11px;
+            border-radius: 6px;
+            padding: 4px 6px;
+            font-size: 13px;
+            font-weight: 600;
             text-align: center;
             outline: none;
-            width: 44px;
-            height: 24px;
+            width: 52px;
+            height: 28px;
             box-sizing: border-box;
         }
         .break-custom-row input:focus {
@@ -725,18 +726,18 @@
         .break-custom-row span {
             color: var(--tg-text-muted);
             font-weight: bold;
-            font-size: 12px;
+            font-size: 13px;
             user-select: none;
         }
         .btn-custom-start {
             background: var(--tg-accent);
             color: #fff;
             border: none;
-            border-radius: 4px;
-            padding: 0 8px;
-            height: 24px;
+            border-radius: 6px;
+            padding: 0 10px;
+            height: 28px;
             cursor: pointer;
-            font-size: 11px;
+            font-size: 12px;
             font-weight: bold;
             display: inline-flex;
             align-items: center;
@@ -751,47 +752,66 @@
         .break-retro-container {
             display: flex;
             flex-direction: column;
-            gap: 4px;
-            padding: 6px 8px;
-            background: rgba(15, 23, 33, 0.85);
+            gap: 8px;
+            padding: 10px 12px;
+            background: rgba(15, 23, 33, 0.9);
             border-top: 1px solid var(--tg-border);
         }
         .break-retro-title {
-            font-size: 10px;
-            color: var(--tg-text-muted);
-            font-weight: 600;
+            font-size: 11px;
+            color: var(--tg-accent);
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .break-retro-row {
+            letter-spacing: 0.4px;
             display: flex;
             align-items: center;
             gap: 4px;
         }
-        .break-time-input {
+        .break-retro-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .break-time-inputs {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            flex-shrink: 0;
+        }
+        .break-time-digit {
             background: var(--tg-input-bg) !important;
             border: 1px solid var(--tg-input-border) !important;
             color: var(--tg-text) !important;
-            border-radius: 4px !important;
-            padding: 2px 4px !important;
-            font-size: 11px !important;
-            height: 24px !important;
-            width: 72px !important;
+            border-radius: 6px !important;
+            padding: 4px !important;
+            font-size: 14px !important;
+            font-weight: 700 !important;
+            height: 32px !important;
+            width: 44px !important;
             outline: none;
             box-sizing: border-box;
+            text-align: center !important;
             font-family: inherit;
         }
-        .break-time-input:focus {
+        .break-time-digit:focus {
             border-color: var(--tg-accent) !important;
+            background: rgba(46, 166, 255, 0.08) !important;
+        }
+        .break-time-colon {
+            font-size: 15px;
+            font-weight: bold;
+            color: var(--tg-text-muted);
+            user-select: none;
         }
         .break-type-select {
             background: var(--tg-input-bg) !important;
             border: 1px solid var(--tg-input-border) !important;
             color: var(--tg-text) !important;
-            border-radius: 4px !important;
-            padding: 2px 4px !important;
-            font-size: 10px !important;
-            height: 24px !important;
+            border-radius: 6px !important;
+            padding: 4px 8px !important;
+            font-size: 12px !important;
+            font-weight: 500 !important;
+            height: 32px !important;
             flex: 1;
             min-width: 0;
             outline: none;
@@ -802,6 +822,29 @@
         .break-type-select option {
             background: var(--tg-card);
             color: var(--tg-text);
+        }
+        .btn-retro-submit {
+            background: var(--tg-accent);
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 10px;
+            height: 32px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: background-color 0.15s, transform 0.05s;
+        }
+        .btn-retro-submit:hover {
+            background: var(--tg-accent-hover, #2077e3);
+        }
+        .btn-retro-submit:active {
+            transform: scale(0.98);
         }
         .btn-break-trigger:disabled,
         .card.is-outage .btn-break-trigger {
@@ -1032,7 +1075,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.15
+    <span class="badge-dot"></span> v1.4.16
 </div>
 
 <div class="container">
@@ -1124,7 +1167,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.15</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.16</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
