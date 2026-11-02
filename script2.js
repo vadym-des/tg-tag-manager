@@ -721,7 +721,7 @@ function processInput() {
 
             div.innerHTML = `
                 <div class="card-header-row">
-                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('active'); updateTags()">
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="this.closest('.card').classList.toggle('active', this.checked); updateTags()">
                     <span class="card-title"><strong>Оп ${escapeHtml(id)}</strong>${name ? ` <span class="card-name">— ${escapeHtml(name)}</span>` : ''}${item.isLead ? ` <span class="lead-crown-icon" title="Головний бази">👑</span>` : ''}</span>
                 </div>
                 <div class="card-footer-row">
@@ -737,6 +737,22 @@ function processInput() {
             `;
             div.dataset.tag = tag;
             div.dataset.handle = tag;
+
+            div.addEventListener('click', function(e) {
+                if (e.target.closest('.btn-outage-toggle') || 
+                    e.target.closest('.break-trigger-wrap') || 
+                    e.target.closest('.break-menu-popover') || 
+                    e.target.closest('.break-countdown-badge')) {
+                    return;
+                }
+                const cb = div.querySelector('input[type="checkbox"]');
+                if (!cb) return;
+                if (e.target === cb) return;
+
+                cb.checked = !cb.checked;
+                div.classList.toggle('active', cb.checked);
+                updateTags();
+            });
         }
 
         grid.appendChild(div);
@@ -779,6 +795,11 @@ function toggleBreakMenu(id, event) {
 
     document.querySelectorAll('.break-menu-popover').forEach(p => p.remove());
 
+    const now = new Date();
+    const curH = String(now.getHours()).padStart(2, '0');
+    const curM = String(now.getMinutes()).padStart(2, '0');
+    const defaultTimeStr = `${curH}:${curM}`;
+
     const popover = document.createElement('div');
     popover.className = 'break-menu-popover';
     popover.innerHTML = `
@@ -789,7 +810,20 @@ function toggleBreakMenu(id, event) {
             <input type="number" id="customMin_${escapeHtml(id)}" placeholder="хв" min="0" max="180">
             <span>:</span>
             <input type="number" id="customSec_${escapeHtml(id)}" placeholder="сек" min="0" max="59">
-            <button type="button" class="btn-custom-start" onclick="startCustomBreak('${escapeHtml(id)}', event)" title="Запустити">▶</button>
+            <button type="button" class="btn-custom-start" onclick="startCustomBreak('${escapeHtml(id)}', event)" title="Запустити кастомний таймер">▶</button>
+        </div>
+        <div class="break-retro-container" onclick="event.stopPropagation()">
+            <div class="break-retro-title">⏰ Взяв раніше (час початку):</div>
+            <div class="break-retro-row">
+                <input type="time" id="retroTime_${escapeHtml(id)}" class="break-time-input" value="${defaultTimeStr}" title="Час коли оператор пішов на перерву">
+                <select id="retroType_${escapeHtml(id)}" class="break-type-select" title="Тривалість перерви">
+                    <option value="3600" selected>🍔 Обід 1г</option>
+                    <option value="900">☕️ 15хв</option>
+                    <option value="1800">☕️ 30хв</option>
+                    <option value="2700">☕️ 45хв</option>
+                </select>
+                <button type="button" class="btn-custom-start" onclick="startRetroBreak('${escapeHtml(id)}', event)" title="Розрахувати та запустити залишок">▶</button>
+            </div>
         </div>
     `;
 
@@ -825,6 +859,87 @@ function startCustomBreak(id, event) {
     }
 
     startBreak(id, totalSeconds, label, event);
+}
+
+function startRetroBreak(id, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const card = document.querySelector(`.card[data-op-id="${id}"]`);
+    if (card && (card.classList.contains('is-outage') || (card.dataset.outage && card.dataset.outage !== 'none'))) return;
+
+    const timeInput = document.getElementById(`retroTime_${id}`);
+    const typeSelect = document.getElementById(`retroType_${id}`);
+    if (!timeInput || !timeInput.value) {
+        showToast('⚠️ Вкажіть час, коли оператор пішов на перерву');
+        return;
+    }
+
+    const [hoursStr, minsStr] = timeInput.value.split(':');
+    const startHour = parseInt(hoursStr, 10);
+    const startMin = parseInt(minsStr, 10);
+    if (isNaN(startHour) || isNaN(startMin)) {
+        showToast('⚠️ Некоректний формат часу');
+        return;
+    }
+
+    const totalSeconds = parseInt(typeSelect ? typeSelect.value : 3600, 10) || 3600;
+    const now = new Date();
+    
+    // Створюємо дату початку перерви для сьогоднішнього дня
+    let startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), startHour, startMin, 0, 0);
+
+    // Обробка нічних змін (якщо зараз ніч < 06:00, а час вказано вечірній >= 18:00)
+    if (now.getHours() < 6 && startHour >= 18) {
+        startDate.setDate(startDate.getDate() - 1);
+    } else if (now.getHours() >= 18 && startHour < 6 && (startDate.getTime() - now.getTime()) > 12 * 3600 * 1000) {
+        startDate.setDate(startDate.getDate() + 1);
+    }
+
+    const breakUntil = startDate.getTime() + (totalSeconds * 1000);
+    const diffMs = breakUntil - Date.now();
+
+    if (diffMs <= 0) {
+        const endDate = new Date(breakUntil);
+        const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+        showToast(`⚠️ Вказана перерва вже закінчилась о ${endStr}!`);
+        return;
+    }
+
+    let label = 'Обід';
+    if (totalSeconds === 900) label = '15 хв';
+    else if (totalSeconds === 1800) label = '30 хв';
+    else if (totalSeconds === 2700) label = '45 хв';
+    else if (totalSeconds >= 3600) label = 'Обід';
+    else label = `${Math.round(totalSeconds / 60)} хв`;
+
+    document.querySelectorAll('.break-menu-popover').forEach(p => p.remove());
+
+    const breaks = getBreaksState();
+    breaks[id] = {
+        startAt: startDate.getTime(),
+        totalMs: totalSeconds * 1000,
+        totalSeconds: totalSeconds,
+        breakUntil: breakUntil,
+        breakType: totalSeconds >= 3600 ? 'lunch' : 'break',
+        label: label
+    };
+    setBreaksState(breaks);
+
+    if (card) {
+        const cb = card.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = false;
+        card.classList.remove('active');
+    }
+
+    checkActiveBreaks();
+
+    const endDate = new Date(breakUntil);
+    const endStr = `${String(endDate.getHours()).padStart(2, '0')}:${String(endDate.getMinutes()).padStart(2, '0')}`;
+    const remMins = Math.ceil(diffMs / (60 * 1000));
+    showToast(`✓ Оп ${id}: ${label} з ${timeInput.value} (до ${endStr} • залишилось ${remMins} хв)`);
+    updateTags();
 }
 
 function startBreak(id, totalSeconds, label, event) {
@@ -1343,6 +1458,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.15",
+        date: "2026-11-02",
+        changes: [
+            { category: "Added", text: "Перемикання активності оператора при кліку в будь-яку точку картки (без необхідності точно цілити в маленький чекбокс)." },
+            { category: "Added", text: "Встановлення часу початку перерви/обіду заднім числом: вкажіть час, коли оператор пішов (наприклад 13:00), і система автоматично розрахує залишок часу до повернення та запустить точний таймер." }
+        ]
+    },
     {
         version: "1.4.14",
         date: "2026-11-02",

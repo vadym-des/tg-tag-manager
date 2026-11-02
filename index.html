@@ -199,6 +199,7 @@
             flex-direction: column;
             gap: 6px;
             position: relative;
+            user-select: none;
         }
         .card:hover {
             background: var(--tg-card-hover);
@@ -684,7 +685,7 @@
             display: flex;
             flex-direction: column;
             z-index: 120;
-            width: 170px;
+            width: 215px;
             overflow: hidden;
         }
         input[type="number"]::-webkit-outer-spin-button,
@@ -746,6 +747,61 @@
         .btn-custom-start:hover {
             background: var(--tg-accent-hover, #2077e3);
             opacity: 0.95;
+        }
+        .break-retro-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            padding: 6px 8px;
+            background: rgba(15, 23, 33, 0.85);
+            border-top: 1px solid var(--tg-border);
+        }
+        .break-retro-title {
+            font-size: 10px;
+            color: var(--tg-text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .break-retro-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .break-time-input {
+            background: var(--tg-input-bg) !important;
+            border: 1px solid var(--tg-input-border) !important;
+            color: var(--tg-text) !important;
+            border-radius: 4px !important;
+            padding: 2px 4px !important;
+            font-size: 11px !important;
+            height: 24px !important;
+            width: 72px !important;
+            outline: none;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+        .break-time-input:focus {
+            border-color: var(--tg-accent) !important;
+        }
+        .break-type-select {
+            background: var(--tg-input-bg) !important;
+            border: 1px solid var(--tg-input-border) !important;
+            color: var(--tg-text) !important;
+            border-radius: 4px !important;
+            padding: 2px 4px !important;
+            font-size: 10px !important;
+            height: 24px !important;
+            flex: 1;
+            min-width: 0;
+            outline: none;
+            box-sizing: border-box;
+            font-family: inherit;
+            cursor: pointer;
+        }
+        .break-type-select option {
+            background: var(--tg-card);
+            color: var(--tg-text);
         }
         .btn-break-trigger:disabled,
         .card.is-outage .btn-break-trigger {
@@ -976,7 +1032,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.14
+    <span class="badge-dot"></span> v1.4.15
 </div>
 
 <div class="container">
@@ -1068,7 +1124,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.14</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.15</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
