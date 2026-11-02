@@ -1367,6 +1367,102 @@ function fallbackCopyInput(inputElem, cb) {
     }
 }
 
+// Шаблон ігнорів для Telegram
+function getDefaultTemplateDate() {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    return `${day}.${month}`;
+}
+
+function initTemplateDate() {
+    const dateInput = document.getElementById('templateDateInput');
+    if (dateInput && !dateInput.value) {
+        dateInput.value = getDefaultTemplateDate();
+    }
+}
+
+function generateIgnoreTemplateText() {
+    const activeCards = Array.from(document.querySelectorAll('.card.active'));
+    const rawTags = activeCards
+        .map(card => (card.dataset.handle || card.dataset.tag || '').trim())
+        .filter(Boolean)
+        .map(tag => tag.startsWith('@') ? tag : `@${tag}`);
+
+    const tagLines = [];
+    for (let i = 0; i < rawTags.length; i += 2) {
+        if (i + 1 < rawTags.length) {
+            tagLines.push(`${rawTags[i]} ${rawTags[i + 1]}`);
+        } else {
+            tagLines.push(rawTags[i]);
+        }
+    }
+    const tagsBlock = tagLines.join('\n');
+
+    const dateInput = document.getElementById('templateDateInput');
+    const hoursInput = document.getElementById('templateHoursInput');
+    const calcResult = document.getElementById('calcResult');
+
+    const dateStr = (dateInput && dateInput.value.trim()) ? dateInput.value.trim() : getDefaultTemplateDate();
+    const hoursStr = (hoursInput && hoursInput.value.trim()) ? hoursInput.value.trim() : '3';
+
+    let perOpVal = calcResult ? calcResult.value.trim() : '0';
+    if (!perOpVal || perOpVal === '0') {
+        const leadsInput = document.getElementById('calcLeadsInput');
+        const leads = parseFloat(leadsInput ? leadsInput.value : 0) || 0;
+        const ops = rawTags.length;
+        if (leads > 0 && ops > 0) {
+            const calculated = leads / ops;
+            perOpVal = Number.isInteger(calculated) ? calculated.toString() : Number(calculated.toFixed(1)).toString();
+        } else {
+            perOpVal = perOpVal || '0';
+        }
+    }
+
+    const header = tagsBlock ? `${tagsBlock}\n\n` : '';
+    return `${header}Переносимо ігнори на ${hoursStr} год\nІГ за ${dateStr} число — по ${perOpVal} шт 🛑`;
+}
+
+function copyIgnoreTemplate() {
+    const activeCards = document.querySelectorAll('.card.active');
+    if (activeCards.length === 0) {
+        showToast('⚠️ Немає вибраних операторів для шаблону');
+        return;
+    }
+
+    const text = generateIgnoreTemplateText();
+    const tagArea = document.getElementById('tagResult');
+    if (tagArea) {
+        tagArea.value = text;
+    }
+
+    const btn = document.getElementById('btnCopyTemplate');
+    const origHtml = btn ? btn.innerHTML : '';
+
+    const onCopySuccess = () => {
+        showToast('✓ Шаблон ігнорів скопійовано!');
+        if (btn) {
+            btn.innerHTML = '✓ Скопійовано!';
+            btn.style.backgroundColor = 'var(--import-btn)';
+            setTimeout(() => {
+                btn.innerHTML = origHtml;
+                btn.style.backgroundColor = '';
+            }, 1600);
+        }
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text)
+            .then(onCopySuccess)
+            .catch(() => {
+                if (tagArea) fallbackCopy(tagArea);
+            });
+    } else if (tagArea) {
+        fallbackCopy(tagArea);
+    }
+}
+
 function exportDbToExcel() {
     if (typeof XLSX === 'undefined') {
         alert('Бібліотеку SheetJS ще не завантажено. Перевірте з\'єднання з інтернетом.');
@@ -1537,10 +1633,19 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     }
     updateButtonStates();
+    initTemplateDate();
     processInput();
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.20",
+        date: "2026-11-02",
+        changes: [
+            { category: "Added", text: "Створено швидкий шаблон для Telegram: автоматичне підтягування тегів операторів (по 2 в рядку), розрахунку заявок на оператора, годин переносу та автоматично оновлюваної дати старого числа (вчорашній день)." },
+            { category: "Added", text: "Кнопка «📋 Скопіювати шаблон» під панеллю розподілу для миттєвого копіювання готового повідомлення з емодзі в буфер обміну." }
+        ]
+    },
     {
         version: "1.4.19",
         date: "2026-11-02",

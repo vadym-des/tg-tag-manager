@@ -1033,6 +1033,113 @@
             transform: translateY(-50%) scale(0.95);
         }
 
+        /* Template Action Bar */
+        .template-action-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: var(--tg-card);
+            border: 1px solid var(--tg-border);
+            border-radius: 12px;
+            padding: 10px 16px;
+            margin-top: 10px;
+            margin-bottom: 6px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            box-sizing: border-box;
+        }
+        .template-params {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .template-param-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .template-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--tg-text-muted);
+            white-space: nowrap;
+        }
+        .template-input-date {
+            width: 64px;
+            height: 34px;
+            background: var(--tg-input-bg);
+            border: 1px solid var(--tg-input-border);
+            border-radius: 8px;
+            color: var(--tg-text);
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            padding: 0 6px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .template-input-date:focus {
+            border-color: var(--tg-accent);
+            box-shadow: 0 0 0 2px rgba(46, 166, 255, 0.2);
+        }
+        .template-suffix {
+            font-size: 13px;
+            color: var(--tg-text-muted);
+            font-weight: 500;
+        }
+        .template-input-hours-wrap {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .template-input-hours {
+            width: 44px;
+            height: 34px;
+            background: var(--tg-input-bg);
+            border: 1px solid var(--tg-input-border);
+            border-radius: 8px;
+            color: var(--tg-text);
+            font-size: 13px;
+            font-weight: 700;
+            text-align: center;
+            padding: 0 4px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .template-input-hours:focus {
+            border-color: var(--tg-accent);
+        }
+        .template-unit {
+            font-size: 13px;
+            color: var(--tg-text-muted);
+            font-weight: 500;
+        }
+        .btn-template-copy {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            background: #0ea5e9;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            white-space: nowrap;
+            height: 34px;
+        }
+        .btn-template-copy:hover {
+            background: #0284c7;
+            transform: translateY(-1px);
+        }
+        .btn-template-copy:active {
+            transform: translateY(0);
+        }
+
         /* Mobile Responsive media query */
         @media (max-width: 640px) {
             body { padding: 12px; padding-bottom: 48px; }
@@ -1066,6 +1173,19 @@
             }
             .calc-divider {
                 display: none;
+            }
+            .template-action-bar {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+                padding: 12px;
+            }
+            .template-params {
+                justify-content: space-between;
+                width: 100%;
+            }
+            .btn-template-copy {
+                width: 100%;
             }
             .db-row {
                 grid-template-columns: 65px 1fr 36px !important;
@@ -1103,7 +1223,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.19
+    <span class="badge-dot"></span> v1.4.20
 </div>
 
 <div class="container">
@@ -1140,6 +1260,26 @@
                 <button type="button" id="btnCopyCalcResult" class="btn-copy-calc" onclick="copyCalcResult()" title="Скопіювати число">📋</button>
             </div>
         </div>
+    </div>
+
+    <div class="template-action-bar">
+        <div class="template-params">
+            <div class="template-param-item">
+                <label for="templateDateInput" class="template-label">ІГ за:</label>
+                <input type="text" id="templateDateInput" class="template-input-date" placeholder="01.11" maxlength="5" title="Дата ігнорів (за замовчуванням вчорашнє число ДД.ММ)">
+                <span class="template-suffix">число</span>
+            </div>
+            <div class="template-param-item">
+                <label for="templateHoursInput" class="template-label">Перенос:</label>
+                <div class="template-input-hours-wrap">
+                    <input type="number" id="templateHoursInput" class="template-input-hours" value="3" min="1" max="24" title="Кількість годин">
+                    <span class="template-unit">год</span>
+                </div>
+            </div>
+        </div>
+        <button type="button" id="btnCopyTemplate" class="btn-template-copy" onclick="copyIgnoreTemplate()" title="Сформувати та скопіювати готовий шаблон для Telegram">
+            📋 Скопіювати шаблон
+        </button>
     </div>
 
     <textarea id="tagResult" readonly placeholder="Результат тегів..." style="margin-top:10px;"></textarea>
@@ -1195,7 +1335,7 @@
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.19</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.20</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
