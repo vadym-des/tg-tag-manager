@@ -1475,7 +1475,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.27
+    <span class="badge-dot"></span> v1.4.28
 </div>
 
 <div id="cloudSyncBadge" class="sync-status-badge" onclick="toggleCloudModal()" title="Статус хмарної синхронізації з Google Sheets">
@@ -1662,7 +1662,12 @@
       status: String(data[i][4] || 'Активний').trim()
     });
   }
-  return ContentService.createTextOutput(JSON.stringify({ status: "success", data: rows }))
+  var output = JSON.stringify({ status: "success", data: rows });
+  if (e && e.parameter && e.parameter.callback) {
+    return ContentService.createTextOutput(e.parameter.callback + '(' + output + ')')
+      .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(output)
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -1724,7 +1729,7 @@ function doPost(e) {
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.27</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.28</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>

@@ -2007,6 +2007,49 @@ function parseGvizTable(table) {
     return newDb;
 }
 
+function checkAppsScriptHealth(url) {
+    if (!url || !url.startsWith('https://script.google.com/')) return;
+    const testCbName = 'gasHealthCheck_' + Math.floor(Math.random() * 1000000);
+    const script = document.createElement('script');
+    script.id = testCbName;
+    script.src = `${url}?callback=${testCbName}&_t=${Date.now()}`;
+
+    let isDone = false;
+    const timeout = setTimeout(() => {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        // Якщо за 8 секунд відповіді немає або 404
+        setSyncStatus('error', 'Хмара: Web App 404/офлайн');
+    }, 8000);
+
+    function cleanup() {
+        clearTimeout(timeout);
+        delete window[testCbName];
+        const elem = document.getElementById(testCbName);
+        if (elem) elem.remove();
+    }
+
+    window[testCbName] = function(res) {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        if (res && res.status === 'success') {
+            const nowStr = formatSyncTime();
+            setSyncStatus('synced', `Хмара: ОК (${nowStr})`);
+        }
+    };
+
+    script.onerror = function() {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        setSyncStatus('error', 'Хмара: Web App недоступний (404)');
+    };
+
+    document.body.appendChild(script);
+}
+
 function saveAppsScriptUrl() {
     const input = document.getElementById('cloudAppsScriptUrlInput');
     const url = input ? input.value.trim() : '';
@@ -2025,6 +2068,7 @@ function saveAppsScriptUrl() {
     localStorage.setItem('google_apps_script_url', url);
     showToast('✓ Apps Script URL збережено!');
     triggerAutoCloudSync();
+    checkAppsScriptHealth(url);
 }
 
 async function pushToGoogleAppsScript(scriptUrl, currentDb, onSuccess, onError) {
@@ -2122,6 +2166,7 @@ function initCloudSyncStatus() {
 
     if (hasAppsScript) {
         setSyncStatus('synced', `Хмара: ОК (${formatSyncTime(lastSync)})`);
+        checkAppsScriptHealth(localStorage.getItem('google_apps_script_url'));
     } else if (hasSheets) {
         setSyncStatus('synced', `Хмара: лінк (${formatSyncTime(lastSync)})`);
     } else {
@@ -2208,6 +2253,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.28",
+        date: "2026-11-03",
+        changes: [
+            { category: "Fixed", text: "Валідація стану Google Apps Script: додано автоматичну перевірку працездатності (health-check) Web App URL через JSONP. Якщо розгортання в Google Apps Script не завершено або повертає 404, статус-індикатор хмари миттєво сповіщає користувача про проблему червоним бейджем замість помилкового «Хмара: ОК»." },
+            { category: "Added", text: "Оновлено інтегрований шаблон Google Apps Script з підтримкою JSONP-відповідей та повної синхронізації 5 колонок разом із Графіком." }
+        ]
+    },
     {
         version: "1.4.27",
         date: "2026-11-02",
