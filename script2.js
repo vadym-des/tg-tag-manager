@@ -1759,20 +1759,155 @@ function toggleCloudModal() {
 }
 
 function initCloudModalFields() {
-    const sheetsInput = document.getElementById('cloudSheetsUrlInput');
-    const appsScriptInput = document.getElementById('cloudAppsScriptUrlInput');
+    const universalInput = document.getElementById('cloudUniversalUrlInput');
     const autoFetchCb = document.getElementById('cloudAutoFetchOnStart');
 
-    if (sheetsInput) {
-        sheetsInput.value = localStorage.getItem('google_sheets_url') || '';
-    }
-    if (appsScriptInput) {
-        appsScriptInput.value = localStorage.getItem('google_apps_script_url') || '';
+    if (universalInput) {
+        universalInput.value = localStorage.getItem('google_apps_script_url') || localStorage.getItem('google_sheets_url') || '';
     }
     if (autoFetchCb) {
         autoFetchCb.checked = localStorage.getItem('cloud_auto_fetch') === 'true';
     }
     updateCloudModalBadge();
+}
+
+function connectUniversalCloud() {
+    const input = document.getElementById('cloudUniversalUrlInput');
+    const url = input ? input.value.trim() : '';
+
+    if (!url) {
+        disconnectCloud();
+        return;
+    }
+
+    // Авто-розпізнавання: це Web App чи звичайна таблиця?
+    if (url.includes('script.google.com/macros/s/')) {
+        // Повна двостороння синхронізація
+        localStorage.setItem('google_apps_script_url', url);
+        localStorage.removeItem('google_sheets_url'); // пріоритет у Web App
+        localStorage.setItem('cloud_auto_fetch', 'true');
+        const autoFetchCb = document.getElementById('cloudAutoFetchOnStart');
+        if (autoFetchCb) autoFetchCb.checked = true;
+
+        showToast('🔗 Підключення до Google Apps Script...');
+        setSyncStatus('syncing', 'Хмара: підключення...');
+        importFromAppsScriptUrl(url, false);
+    } else if (url.includes('docs.google.com/spreadsheets/d/')) {
+        // Read-only підключення за прямим посиланням
+        localStorage.setItem('google_sheets_url', url);
+        localStorage.removeItem('google_apps_script_url');
+        localStorage.setItem('cloud_auto_fetch', 'true');
+        const autoFetchCb = document.getElementById('cloudAutoFetchOnStart');
+        if (autoFetchCb) autoFetchCb.checked = true;
+
+        showToast('📥 Завантаження з Google Sheets...');
+        importFromGoogleSheetsUrl(false);
+    } else {
+        alert('Некоректне посилання. Вставте Web App URL (script.google.com/.../exec) або посилання на таблицю (docs.google.com/spreadsheets/d/...)');
+    }
+}
+
+function disconnectCloud() {
+    localStorage.removeItem('google_apps_script_url');
+    localStorage.removeItem('google_sheets_url');
+    localStorage.removeItem('last_cloud_sync');
+    setSyncStatus('offline', 'Хмара: локально');
+    const input = document.getElementById('cloudUniversalUrlInput');
+    if (input) input.value = '';
+    updateCloudModalBadge();
+    showToast('ℹ️ Хмарну синхронізацію відключено (локальний режим)');
+}
+
+function importFromAppsScriptUrl(scriptUrl, isQuiet = false) {
+    if (!scriptUrl) return;
+    const testCbName = 'gasImportCb_' + Math.floor(Math.random() * 1000000);
+    const script = document.createElement('script');
+    script.id = testCbName;
+    script.src = `${scriptUrl}?callback=${testCbName}&_t=${Date.now()}`;
+
+    let isDone = false;
+    const timeout = setTimeout(() => {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        setSyncStatus('error', 'Хмара: Web App офлайн');
+        if (!isQuiet) alert('Помилка: не вдалося отримати відповідь від Google Apps Script. Перевірте, чи доступ налаштовано для «Anyone» (Усі).');
+    }, 12000);
+
+    function cleanup() {
+        clearTimeout(timeout);
+        delete window[testCbName];
+        const elem = document.getElementById(testCbName);
+        if (elem) elem.remove();
+    }
+
+    window[testCbName] = function(res) {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+
+        if (!res || !Array.isArray(res.data)) {
+            setSyncStatus('error', 'Хмара: некоректна відповідь');
+            if (!isQuiet) alert('Отримано некоректний формат даних від скрипта');
+            return;
+        }
+
+        const newDb = {};
+        res.data.forEach(item => {
+            const id = String(item.id || '').trim();
+            if (!id) return;
+            const name = sanitizeName(item.name, id);
+            let tag = String(item.tag || '').trim();
+            if (tag && !tag.startsWith('@')) tag = `@${tag}`;
+            const schedule = String(item.schedule || '').trim();
+            const rawStatus = String(item.status || 'active').toLowerCase();
+            const isDismissed = rawStatus.includes('звільн') || rawStatus === 'dismissed' || name.toLowerCase().includes('звільн');
+
+            newDb[id] = {
+                name: name,
+                tag: tag,
+                handle: tag,
+                schedule: schedule,
+                status: isDismissed ? 'Звільнився' : 'Активний',
+                dismissed: isDismissed
+            };
+        });
+
+        const count = Object.keys(newDb).length;
+        if (count === 0) {
+            setSyncStatus('error', 'Хмара: порожня таблиця');
+            if (!isQuiet) alert('У Google Таблиці не знайдено записів операторів');
+            return;
+        }
+
+        // Зберігаємо локальні графіки, якщо в хмарі вони порожні
+        const existingDb = db || {};
+        for (const [id, op] of Object.entries(newDb)) {
+            if (!op.schedule && existingDb[id] && existingDb[id].schedule) {
+                op.schedule = existingDb[id].schedule;
+            }
+        }
+
+        db = newDb;
+        localStorage.setItem('opsDB', JSON.stringify(db));
+        localStorage.setItem('operator_db', JSON.stringify(db));
+        localStorage.setItem('last_cloud_sync', Date.now().toString());
+
+        updateButtonStates();
+        processInput();
+        setSyncStatus('synced', `Хмара: ОК (${formatSyncTime()})`);
+        showToast(`✓ Успішно підключено та синхронізовано ${count} операторів!`);
+    };
+
+    script.onerror = function() {
+        if (isDone) return;
+        isDone = true;
+        cleanup();
+        setSyncStatus('error', 'Хмара: Web App 404');
+        if (!isQuiet) alert('Помилка завантаження Web App. Перевірте URL.');
+    };
+
+    document.body.appendChild(script);
 }
 
 function toggleAutoFetchSetting(checked) {
@@ -2133,14 +2268,14 @@ function syncAllCloudNow() {
     const sheetsUrl = localStorage.getItem('google_sheets_url');
 
     if (!scriptUrl && !sheetsUrl) {
-        alert('Будь ласка, спочатку вкажіть посилання на Google Таблицю або Apps Script URL');
+        alert('Будь ласка, спочатку підключіть посилання на хмару');
         return;
     }
 
-    if (sheetsUrl) {
+    if (scriptUrl) {
+        importFromAppsScriptUrl(scriptUrl, false);
+    } else if (sheetsUrl) {
         importFromGoogleSheetsUrl(false);
-    } else if (scriptUrl) {
-        triggerAutoCloudSync();
     }
 }
 
@@ -2159,22 +2294,25 @@ function copyAppsScriptCode() {
 }
 
 function initCloudSyncStatus() {
-    const hasAppsScript = !!localStorage.getItem('google_apps_script_url');
-    const hasSheets = !!localStorage.getItem('google_sheets_url');
+    const scriptUrl = localStorage.getItem('google_apps_script_url');
+    const sheetsUrl = localStorage.getItem('google_sheets_url');
     const lastSync = localStorage.getItem('last_cloud_sync');
     const autoFetch = localStorage.getItem('cloud_auto_fetch') === 'true';
 
-    if (hasAppsScript) {
+    if (scriptUrl) {
         setSyncStatus('synced', `Хмара: ОК (${formatSyncTime(lastSync)})`);
-        checkAppsScriptHealth(localStorage.getItem('google_apps_script_url'));
-    } else if (hasSheets) {
+        if (autoFetch) {
+            importFromAppsScriptUrl(scriptUrl, true);
+        } else {
+            checkAppsScriptHealth(scriptUrl);
+        }
+    } else if (sheetsUrl) {
         setSyncStatus('synced', `Хмара: лінк (${formatSyncTime(lastSync)})`);
+        if (autoFetch) {
+            importFromGoogleSheetsUrl(true);
+        }
     } else {
         setSyncStatus('offline', 'Хмара: локально');
-    }
-
-    if (autoFetch && hasSheets) {
-        importFromGoogleSheetsUrl(true);
     }
 }
 
@@ -2253,6 +2391,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.29",
+        date: "2026-11-03",
+        changes: [
+            { category: "Added", text: "Синхронізація в 1 посилання (All-in-One Cloud Key): повністю об'єднано панель хмари. Тепер користувачеві достатньо вставити лише одне посилання (Web App URL або посилання на таблицю), і система автоматично налаштовує читання, завантаження 34 операторів, авто-оновлення та двосторонній запис при змінах." },
+            { category: "Fixed", text: "Автоматичне читання напряму з Web App через JSONP: відтепер при введенні скрипта дані миттєво підтягуються без необхідності копіювати друге посилання на таблицю." },
+            { category: "Added", text: "Кнопка «Відключити» у модальному вікні хмари для швидкого повернення в автономний локальний режим в 1 клік." }
+        ]
+    },
     {
         version: "1.4.28",
         date: "2026-11-03",

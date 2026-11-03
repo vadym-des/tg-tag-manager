@@ -1475,7 +1475,7 @@
 <div id="toastNotification" class="toast">✓ Теги успішно скопійовано!</div>
 
 <div id="appVersionBadge" class="version-badge" onclick="toggleChangelogModal()" title="Історія оновлень">
-    <span class="badge-dot"></span> v1.4.28
+    <span class="badge-dot"></span> v1.4.29
 </div>
 
 <div id="cloudSyncBadge" class="sync-status-badge" onclick="toggleCloudModal()" title="Статус хмарної синхронізації з Google Sheets">
@@ -1603,46 +1603,31 @@
             </div>
         </div>
         <div class="modal-body" style="max-height: 65vh; overflow-y: auto;">
-            <!-- Секція 1: Швидке читання з посилання -->
+            <!-- Єдина універсальна форма синхронізації -->
             <div class="cloud-section-card">
                 <div class="cloud-section-title">
-                    <span>1. Швидкий імпорт / оновлення за посиланням</span>
-                    <span style="font-size:11px; background:rgba(16, 185, 129, 0.15); color:#10b981; padding:2px 6px; border-radius:4px;">Read-Only</span>
+                    <span>🔑 Підключення бази даних</span>
+                    <span style="font-size:11px; background:rgba(16, 185, 129, 0.15); color:#10b981; padding:2px 6px; border-radius:4px;">All-in-One Cloud</span>
                 </div>
                 <div class="cloud-section-desc">
-                    Вставте посилання на вашу Google Таблицю (має бути відкритий доступ: <i>«Усі, хто має посилання, можуть переглядати»</i>).
+                    Вставте єдине посилання на ваш <b>Web App URL</b> (Google Apps Script) або публічну Google Таблицю для повної синхронізації.
                 </div>
                 <div class="cloud-input-group">
-                    <input type="url" id="cloudSheetsUrlInput" placeholder="https://docs.google.com/spreadsheets/d/1a2b3c4d5e.../edit" title="Посилання на Google Таблицю">
-                    <button type="button" class="btn-import" onclick="importFromGoogleSheetsUrl()" style="white-space:nowrap; padding:0 14px;">📥 Завантажити</button>
+                    <input type="url" id="cloudUniversalUrlInput" placeholder="https://script.google.com/macros/s/.../exec або docs.google.com/..." title="Посилання на Web App або Google Таблицю">
+                    <button type="button" class="btn-primary" onclick="connectUniversalCloud()" style="white-space:nowrap; padding:0 16px;">🔗 Підключити</button>
                 </div>
-                <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--tg-text-muted); cursor:pointer; margin-top:6px;">
+                <label style="display:flex; align-items:center; gap:8px; font-size:12px; color:var(--tg-text-muted); cursor:pointer; margin-top:8px;">
                     <input type="checkbox" id="cloudAutoFetchOnStart" onchange="toggleAutoFetchSetting(this.checked)">
                     Автоматично підтягувати свіжу базу при кожному запуску сторінки
                 </label>
-            </div>
-
-            <!-- Секція 2: Повна двостороння синхронізація -->
-            <div class="cloud-section-card">
-                <div class="cloud-section-title">
-                    <span>2. Двостороння синхронізація (Читання + Авто-запис)</span>
-                    <span style="font-size:11px; background:rgba(46, 166, 255, 0.15); color:var(--tg-accent); padding:2px 6px; border-radius:4px;">Two-Way Sync</span>
-                </div>
-                <div class="cloud-section-desc">
-                    Дозволяє автоматично зберігати будь-які зміни (додавання, зміна статусу або видалення оператора) прямо у вашу Google Таблицю через Apps Script.
-                </div>
-                <div class="cloud-input-group">
-                    <input type="url" id="cloudAppsScriptUrlInput" placeholder="https://script.google.com/macros/s/.../exec" title="Web App URL з Google Apps Script">
-                    <button type="button" class="btn-primary" onclick="saveAppsScriptUrl()" style="white-space:nowrap; padding:0 14px;">💾 Зберегти</button>
-                </div>
                 
-                <details style="margin-top:10px;">
+                <details style="margin-top:14px;">
                     <summary style="font-size:12px; font-weight:600; color:var(--tg-accent); cursor:pointer;">
-                        📖 Інструкція налаштування Google Apps Script за 1 хвилину
+                        📖 Як отримати посилання за 1 хвилину (Інструкція)
                     </summary>
                     <div style="font-size:12px; color:var(--tg-text-muted); line-height:1.5; margin-top:8px;">
                         <ol style="padding-left:18px; margin:0 0 8px 0;">
-                            <li>У вашій Google Таблиці відкрийте меню: <b>Розширення (Extensions) ➔ Apps Script</b>.</li>
+                            <li>У вашій Google Таблиці відкрийте: <b>Розширення (Extensions) ➔ Apps Script</b>.</li>
                             <li>Видаліть усе та вставте наведений нижче код.</li>
                             <li>Натисніть <b>Розгорнути (Deploy) ➔ Нове розгортання (New deployment)</b>.</li>
                             <li>Оберіть тип: <b>Веб-додаток (Web app)</b>, доступ (Who has access): <b>Усі (Anyone)</b>.</li>
@@ -1704,6 +1689,7 @@ function doPost(e) {
         <div class="modal-footer">
             <span style="font-size:12px; color:var(--tg-text-muted);">Безпека Zero-Leak: дані та посилання зберігаються локально.</span>
             <div class="modal-footer-btns">
+                <button type="button" onclick="disconnectCloud()" class="btn-danger" style="padding:0 12px; font-size:12px;">Відключити</button>
                 <button type="button" onclick="syncAllCloudNow()" class="btn-import">🔄 Синхронізувати зараз</button>
                 <button type="button" onclick="toggleCloudModal()" class="btn-secondary">Закрити</button>
             </div>
@@ -1729,7 +1715,7 @@ function doPost(e) {
         </div>
         <div class="modal-body" id="changelogContainer" style="max-height: 56vh;"></div>
         <div class="modal-footer">
-            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.28</span>
+            <span style="font-size:13px; color:var(--tg-text-muted);">Поточна версія: v1.4.29</span>
             <div class="modal-footer-btns">
                 <button onclick="toggleChangelogModal()" class="btn-secondary">Закрити</button>
             </div>
