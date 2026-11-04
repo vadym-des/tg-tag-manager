@@ -768,6 +768,7 @@ function processInput() {
     }
 
     const input = document.getElementById('inputIds')?.value || '';
+    saveSessionState();
     grid.innerHTML = '';
     const parsedItems = parseOperatorInputTokens(input);
 
@@ -1417,6 +1418,7 @@ function updateTags() {
         calcOpsInput.value = tags.length;
         calculateLeadDistribution();
     }
+    saveSessionState();
 }
 
 function calculateLeadDistribution() {
@@ -1501,11 +1503,73 @@ function getDefaultTemplateDate() {
     return `${day}.${month}`;
 }
 
-function initTemplateDate() {
+function initTemplateDate(forceUpdate = false) {
     const dateInput = document.getElementById('templateDateInput');
-    if (dateInput && !dateInput.value) {
+    if (!dateInput) return;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const lastSessionDate = localStorage.getItem('last_active_date');
+
+    // Якщо новий календарний день або перша ініціалізація
+    if (forceUpdate || !dateInput.value || lastSessionDate !== todayStr) {
         dateInput.value = getDefaultTemplateDate();
+        localStorage.setItem('last_active_date', todayStr);
     }
+}
+
+// Збереження та відновлення стану робочої сесії (введений текст, заявки, перенос тощо)
+function saveSessionState() {
+    try {
+        const inputIds = document.getElementById('inputIds');
+        const calcLeads = document.getElementById('calcLeadsInput');
+        const templateHours = document.getElementById('templateHoursInput');
+        const templateDate = document.getElementById('templateDateInput');
+
+        const state = {
+            inputIds: inputIds ? inputIds.value : '',
+            calcLeads: calcLeads ? calcLeads.value : '',
+            templateHours: templateHours ? templateHours.value : '3',
+            templateDate: templateDate ? templateDate.value : '',
+            savedAt: Date.now()
+        };
+        localStorage.setItem('tg_session_state', JSON.stringify(state));
+    } catch (e) {}
+}
+
+function restoreSessionState() {
+    try {
+        const raw = localStorage.getItem('tg_session_state');
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (!state || typeof state !== 'object') return;
+
+        const inputIds = document.getElementById('inputIds');
+        const calcLeads = document.getElementById('calcLeadsInput');
+        const templateHours = document.getElementById('templateHoursInput');
+        const templateDate = document.getElementById('templateDateInput');
+
+        if (inputIds && state.inputIds !== undefined && !inputIds.value) {
+            inputIds.value = state.inputIds;
+        }
+        if (calcLeads && state.calcLeads !== undefined && calcLeads.value === '') {
+            calcLeads.value = state.calcLeads;
+        }
+        if (templateHours && state.templateHours !== undefined && templateHours.value === '') {
+            templateHours.value = state.templateHours;
+        }
+
+        // Перевіряємо дату: якщо настав новий день, ставимо актуальну вчорашню дату
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const lastSessionDate = localStorage.getItem('last_active_date');
+        if (templateDate) {
+            if (lastSessionDate !== todayStr || !state.templateDate) {
+                templateDate.value = getDefaultTemplateDate();
+                localStorage.setItem('last_active_date', todayStr);
+            } else {
+                templateDate.value = state.templateDate;
+            }
+        }
+    } catch (e) {}
 }
 
 function generateIgnoreTemplateText() {
@@ -2374,11 +2438,15 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
     }
     updateButtonStates();
+    restoreSessionState();
     initTemplateDate();
     initCloudSyncStatus();
 
     const inputIds = document.getElementById('inputIds');
     if (inputIds) {
+        inputIds.addEventListener('input', () => {
+            saveSessionState();
+        });
         inputIds.addEventListener('keydown', (e) => {
             if ((e.key === 'Enter' && (e.metaKey || e.ctrlKey)) || (e.key === 'Enter' && !e.shiftKey)) {
                 e.preventDefault();
@@ -2387,10 +2455,49 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
+    const calcLeadsInput = document.getElementById('calcLeadsInput');
+    if (calcLeadsInput) {
+        calcLeadsInput.addEventListener('input', () => {
+            saveSessionState();
+        });
+    }
+
+    const templateDateInput = document.getElementById('templateDateInput');
+    if (templateDateInput) {
+        templateDateInput.addEventListener('input', () => {
+            saveSessionState();
+        });
+    }
+
+    const templateHoursInput = document.getElementById('templateHoursInput');
+    if (templateHoursInput) {
+        templateHoursInput.addEventListener('input', () => {
+            saveSessionState();
+        });
+    }
+
+    // Перевірка дати при кожному поверненні користувача на вкладку (без перезавантаження)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            initTemplateDate();
+        }
+    });
+    window.addEventListener('focus', () => {
+        initTemplateDate();
+    });
+
     processInput();
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.30",
+        date: "2026-11-04",
+        changes: [
+            { category: "Added", text: "Автоматичне збереження розподілу між перезавантаженнями сторінки: введений текст розподілу, номери операторів, кількість заявок та налаштування переносу тепер зберігаються в localStorage. При звичайному відкритті чи перезавантаженні сторінки (Cmd+R / F5) розподіл більше ніколи не зникає!" },
+            { category: "Fixed", text: "Автоматичне оновлення дати заднім числом: впроваджено щоденний календарний контроль (автоматичний розрахунок вчорашнього дня при настанні нової дати). Також дата автоматично оновлюється при поверненні користувача на вкладку браузера (події visibilitychange / window focus) навіть без перезавантаження сторінки." }
+        ]
+    },
     {
         version: "1.4.29",
         date: "2026-11-03",
