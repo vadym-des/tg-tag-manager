@@ -1509,11 +1509,22 @@ function initTemplateDate(forceUpdate = false) {
 
     const todayStr = new Date().toISOString().slice(0, 10);
     const lastSessionDate = localStorage.getItem('last_active_date');
+    const userOverridden = localStorage.getItem('user_manual_date_override');
 
-    // Якщо новий календарний день або перша ініціалізація
-    if (forceUpdate || !dateInput.value || lastSessionDate !== todayStr) {
+    // Якщо настав новий календарний день
+    if (lastSessionDate !== todayStr) {
         dateInput.value = getDefaultTemplateDate();
         localStorage.setItem('last_active_date', todayStr);
+        localStorage.removeItem('user_manual_date_override');
+        saveSessionState();
+        return;
+    }
+
+    // Якщо дата ще порожня або примусове оновлення
+    if (forceUpdate || !dateInput.value) {
+        dateInput.value = getDefaultTemplateDate();
+        localStorage.setItem('last_active_date', todayStr);
+        saveSessionState();
     }
 }
 
@@ -1530,6 +1541,7 @@ function saveSessionState() {
             calcLeads: calcLeads ? calcLeads.value : '',
             templateHours: templateHours ? templateHours.value : '3',
             templateDate: templateDate ? templateDate.value : '',
+            sessionDate: new Date().toISOString().slice(0, 10),
             savedAt: Date.now()
         };
         localStorage.setItem('tg_session_state', JSON.stringify(state));
@@ -1558,13 +1570,18 @@ function restoreSessionState() {
             templateHours.value = state.templateHours;
         }
 
-        // Перевіряємо дату: якщо настав новий день, ставимо актуальну вчорашню дату
+        // Автоматичне динамічне визначення дати:
+        // Якщо настав новий календарний день (відмінний від sessionDate або last_active_date),
+        // завжди автоматично обчислюємо актуальне вчорашнє число!
         const todayStr = new Date().toISOString().slice(0, 10);
-        const lastSessionDate = localStorage.getItem('last_active_date');
+        const lastSessionDate = localStorage.getItem('last_active_date') || state.sessionDate;
+        const userOverridden = localStorage.getItem('user_manual_date_override');
+
         if (templateDate) {
-            if (lastSessionDate !== todayStr || !state.templateDate) {
+            if (lastSessionDate !== todayStr || !state.templateDate || !userOverridden) {
                 templateDate.value = getDefaultTemplateDate();
                 localStorage.setItem('last_active_date', todayStr);
+                localStorage.removeItem('user_manual_date_override');
             } else {
                 templateDate.value = state.templateDate;
             }
@@ -2465,6 +2482,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const templateDateInput = document.getElementById('templateDateInput');
     if (templateDateInput) {
         templateDateInput.addEventListener('input', () => {
+            localStorage.setItem('user_manual_date_override', 'true');
             saveSessionState();
         });
     }
@@ -2490,6 +2508,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.31",
+        date: "2026-11-11",
+        changes: [
+            { category: "Fixed", text: "Автоматичний перерахунок дати ігнорів заднім числом: виправлено випадок, коли збережений стан сесії (tg_session_state) блокував авто-оновлення дати при настанні нового робочого дня. Тепер щоранку або при зміні календарної доби дата автоматично стає вчорашнім числом (наприклад, 11-го числа автоматично ставиться 10.11, а 12-го — 11.11) без необхідності ручного вводу чи очищення кешу." }
+        ]
+    },
     {
         version: "1.4.30",
         date: "2026-11-04",
