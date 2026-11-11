@@ -1998,20 +1998,229 @@ function toggleAutoFetchSetting(checked) {
 
 function updateCloudModalBadge() {
     const badge = document.getElementById('cloudModalStatusBadge');
-    if (!badge) return;
+    const actionsBox = document.getElementById('cloudConnectedActionsBox');
+    const actionsTime = document.getElementById('cloudConnectedTimestamp');
     const hasAppsScript = !!localStorage.getItem('google_apps_script_url');
     const hasSheets = !!localStorage.getItem('google_sheets_url');
+    const isConnected = hasAppsScript || hasSheets;
+    const lastSync = localStorage.getItem('last_cloud_sync');
 
-    if (hasAppsScript) {
-        badge.innerText = '🟢 Двостороння синхронізація (Apps Script)';
-        badge.style.color = '#10b981';
-    } else if (hasSheets) {
-        badge.innerText = '🔵 Читання за посиланням (Google Sheets)';
-        badge.style.color = 'var(--tg-accent)';
-    } else {
-        badge.innerText = '⚪️ Локальний режим';
-        badge.style.color = 'var(--tg-text-muted)';
+    if (badge) {
+        if (hasAppsScript) {
+            badge.innerText = '🟢 Двостороння синхронізація (Apps Script)';
+            badge.style.color = '#10b981';
+        } else if (hasSheets) {
+            badge.innerText = '🔵 Читання за посиланням (Google Sheets)';
+            badge.style.color = 'var(--tg-accent)';
+        } else {
+            badge.innerText = '⚪️ Локальний режим';
+            badge.style.color = 'var(--tg-text-muted)';
+        }
     }
+
+    if (actionsBox) {
+        actionsBox.style.display = isConnected ? 'block' : 'none';
+        if (actionsTime) {
+            actionsTime.innerText = lastSync ? `Оновлено: ${formatSyncTime(lastSync)}` : '';
+        }
+    }
+
+    // Оновлення пунктів меню в головному випадаючому вікні «⚙️ База ▾»
+    const menuViewBtn = document.getElementById('menuBtnViewCloudDb');
+    const menuOpenBtn = document.getElementById('menuBtnOpenGoogleSheets');
+    const menuDivider = document.getElementById('menuCloudDivider');
+    if (menuViewBtn) menuViewBtn.style.display = isConnected ? 'flex' : 'none';
+    if (menuOpenBtn) menuOpenBtn.style.display = isConnected ? 'flex' : 'none';
+    if (menuDivider) menuDivider.style.display = isConnected ? 'block' : 'none';
+}
+
+function openConnectedGoogleSheet() {
+    const directSheetUrl = localStorage.getItem('google_sheet_direct_url') || localStorage.getItem('google_sheets_url');
+    if (directSheetUrl) {
+        window.open(directSheetUrl, '_blank');
+        return;
+    }
+
+    const scriptUrl = localStorage.getItem('google_apps_script_url');
+    if (scriptUrl) {
+        // Якщо прямого посилання на таблицю ще немає в кеші, робимо швидкий пінг скрипта для отримання sheetUrl
+        showToast('🔍 Отримання посилання на таблицю...');
+        fetchCloudDataDirect((cloudData, rawMeta) => {
+            const sheetUrl = rawMeta?.sheetUrl;
+            if (sheetUrl) {
+                localStorage.setItem('google_sheet_direct_url', sheetUrl);
+                window.open(sheetUrl, '_blank');
+            } else {
+                window.open(scriptUrl, '_blank');
+            }
+        }, () => {
+            window.open(scriptUrl, '_blank');
+        });
+        return;
+    }
+
+    showToast('⚠️ Спочатку підключіть посилання на хмару');
+}
+
+function openCloudViewModal() {
+    const modal = document.getElementById('cloudViewModal');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    fetchAndRenderCloudView();
+}
+
+function closeCloudViewModal() {
+    const modal = document.getElementById('cloudViewModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function fetchCloudDataDirect(onSuccess, onError) {
+    const scriptUrl = localStorage.getItem('google_apps_script_url');
+    const sheetsUrl = localStorage.getItem('google_sheets_url');
+
+    if (scriptUrl) {
+        const testCbName = 'gasDirectFetch_' + Math.floor(Math.random() * 1000000);
+        const script = document.createElement('script');
+        script.id = testCbName;
+        script.src = `${scriptUrl}?callback=${testCbName}&_t=${Date.now()}`;
+
+        let isDone = false;
+        const timeout = setTimeout(() => {
+            if (isDone) return;
+            isDone = true;
+            cleanup();
+            if (onError) onError('Таймаут відповіді від Web App');
+        }, 10000);
+
+        function cleanup() {
+            clearTimeout(timeout);
+            delete window[testCbName];
+            const elem = document.getElementById(testCbName);
+            if (elem) elem.remove();
+        }
+
+        window[testCbName] = function(res) {
+            if (isDone) return;
+            isDone = true;
+            cleanup();
+            if (res && res.sheetUrl) {
+                localStorage.setItem('google_sheet_direct_url', res.sheetUrl);
+            }
+            if (res && Array.isArray(res.data)) {
+                onSuccess(res.data, res);
+            } else {
+                if (onError) onError('Некоректний формат відповіді Web App');
+            }
+        };
+
+        script.onerror = function() {
+            if (isDone) return;
+            isDone = true;
+            cleanup();
+            if (onError) onError('Помилка завантаження Web App (404/Network)');
+        };
+
+        document.body.appendChild(script);
+        return;
+    }
+
+    if (sheetsUrl) {
+        const sheetId = extractSpreadsheetId(sheetsUrl);
+        if (!sheetId) {
+            if (onError) onError('Некоректний ID Google Таблиці');
+            return;
+        }
+        fetchGoogleSheetsGviz(sheetId, (parsedDb) => {
+            const arr = Object.keys(parsedDb).map(id => ({
+                id,
+                name: parsedDb[id].name,
+                tag: parsedDb[id].tag,
+                schedule: parsedDb[id].schedule,
+                status: parsedDb[id].status
+            }));
+            onSuccess(arr, { sheetUrl: sheetsUrl });
+        }, (err) => {
+            if (onError) onError(err);
+        });
+        return;
+    }
+
+    if (onError) onError('Немає підключеного посилання на хмару');
+}
+
+function fetchAndRenderCloudView() {
+    const container = document.getElementById('cloudViewTableContainer');
+    const badge = document.getElementById('cloudViewTotalBadge');
+    const lastSyncText = document.getElementById('cloudViewLastSyncText');
+    if (!container) return;
+
+    container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--tg-text-muted);">
+        <span class="sync-dot sync-loading" style="display:inline-block; vertical-align:middle; margin-right:6px;"></span>
+        Отримання найсвіжіших даних безпосередньо з Google...
+    </div>`;
+
+    if (badge) badge.innerText = 'Завантаження...';
+    if (lastSyncText) lastSyncText.innerText = 'Зв\'язок із сервером Google...';
+
+    fetchCloudDataDirect((items, meta) => {
+        if (!items || items.length === 0) {
+            container.innerHTML = `<div style="text-align:center; padding:30px; color:var(--warn);">У Google Таблиці немає записів.</div>`;
+            if (badge) badge.innerText = 'Всього: 0';
+            return;
+        }
+
+        // Сортуємо за ID
+        items.sort((a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0));
+
+        let rowsHtml = '';
+        items.forEach(op => {
+            const rawStatus = String(op.status || 'Активний').toLowerCase();
+            const isDis = rawStatus.includes('звільн') || rawStatus === 'dismissed';
+            const statusLabel = isDis ? 'Звільнився' : 'Активний';
+            const statusClass = isDis ? 'dismissed' : 'active';
+            const schedStr = op.schedule ? `<span style="font-size:12px; color:var(--tg-accent); background:rgba(46,166,255,0.12); padding:2px 6px; border-radius:4px;">🕒 ${escapeHtml(op.schedule)}</span>` : '<span style="color:var(--tg-text-muted); font-size:12px;">—</span>';
+
+            rowsHtml += `
+                <div style="display:grid; grid-template-columns: 55px 1.2fr 1.2fr 110px 100px; gap:8px; align-items:center; padding:8px 12px; background:var(--tg-input-bg); border-radius:8px; border:1px solid var(--tg-border); font-size:13px;">
+                    <div><strong>#${escapeHtml(op.id)}</strong></div>
+                    <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${escapeHtml(op.name)}">${escapeHtml(op.name || '—')}</div>
+                    <div style="color:var(--tg-accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escapeHtml(op.tag || '—')}</div>
+                    <div>${schedStr}</div>
+                    <div>
+                        <span class="status-select ${statusClass}" style="display:inline-block; font-size:11px; padding:3px 8px; border-radius:4px; text-align:center; width:100%;">
+                            ${statusLabel}
+                        </span>
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = `
+            <div style="display:grid; grid-template-columns: 55px 1.2fr 1.2fr 110px 100px; gap:8px; padding:6px 12px; font-size:11px; font-weight:700; color:var(--tg-text-muted); text-transform:uppercase;">
+                <div>ID</div>
+                <div>Ім'я</div>
+                <div>Telegram</div>
+                <div>Графік</div>
+                <div>Статус</div>
+            </div>
+            ${rowsHtml}
+        `;
+
+        const nowStr = formatSyncTime();
+        if (badge) badge.innerText = `Всього в хмарі: ${items.length}`;
+        if (lastSyncText) lastSyncText.innerText = `✓ Актуальні дані підтверджено сервером Google (${nowStr})`;
+        localStorage.setItem('last_cloud_sync', Date.now().toString());
+        updateCloudModalBadge();
+    }, (err) => {
+        container.innerHTML = `
+            <div style="text-align:center; padding:30px; color:var(--warn); line-height:1.5;">
+                <div style="font-size:16px; font-weight:700; margin-bottom:6px;">⚠️ Не вдалося завантажити хмарні дані</div>
+                <div style="font-size:13px; color:var(--tg-text-muted);">${escapeHtml(String(err))}</div>
+            </div>
+        `;
+        if (badge) badge.innerText = 'Помилка';
+        if (lastSyncText) lastSyncText.innerText = 'Немає зв\'язку з таблицею';
+    });
 }
 
 function extractSpreadsheetId(url) {
@@ -2508,6 +2717,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 });
 
 const APP_CHANGELOG = [
+    {
+        version: "1.4.32",
+        date: "2026-11-11",
+        changes: [
+            { category: "Added", text: "Вбудований перегляд хмарної таблиці безпосередньо з сайту: додано кнопку «👁 Переглянути дані в хмарі» в меню бази та у вікні синхронізації. Дозволяє миттєво перевірити актуальний стан записів (ID, Ім'я, Telegram, Графік, Статус) прямо в інтерфейсі без необхідності заходити на Google Диск." },
+            { category: "Added", text: "Прямий перехід до Google Sheets в 1 клік: додано кнопку «📊 Відкрити в Google Sheets ↗», яка автоматично відкриває підключену таблицю у новій вкладці за отриманим з хмари посиланням." },
+            { category: "Security", text: "Суворий гейтинг доступу: кнопки перегляду та відкриття таблиці з'являються виключно після того, як користувач ввів ключ або посилання на хмару." }
+        ]
+    },
     {
         version: "1.4.31",
         date: "2026-11-11",
