@@ -2703,20 +2703,75 @@ window.addEventListener('DOMContentLoaded', async () => {
         });
     }
 
-    // Перевірка дати при кожному поверненні користувача на вкладку (без перезавантаження)
+    // Перевірка дати та авто-оновлення версії сайту при поверненні на вкладку або періодично
     document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
             initTemplateDate();
+            checkForAppUpdate();
         }
     });
     window.addEventListener('focus', () => {
         initTemplateDate();
+        checkForAppUpdate();
     });
+
+    checkForAppUpdate(true);
+    setInterval(() => checkForAppUpdate(), 5 * 60 * 1000);
 
     processInput();
 });
 
+const APP_VERSION = '1.4.33';
+let lastUpdateCheckTs = 0;
+
+async function checkForAppUpdate(forceImmediate = false) {
+    if (!window.location.protocol.startsWith('http')) return;
+    const now = Date.now();
+    if (!forceImmediate && (now - lastUpdateCheckTs) < 30000) return;
+    lastUpdateCheckTs = now;
+
+    try {
+        const res = await fetch(`index.html?_ts=${now}`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const html = await res.text();
+        const metaMatch = html.match(/<meta\s+name=["']app-version["']\s+content=["']([^"']+)["']/i);
+        const badgeMatch = html.match(/id=["']appVersionBadge["'][\s\S]*?v(\d+\.\d+\.\d+)/i);
+        const remoteVersion = (metaMatch && metaMatch[1]) || (badgeMatch && badgeMatch[1]);
+
+        if (!remoteVersion || remoteVersion === APP_VERSION) return;
+
+        // Захист від нескінченного перезавантаження, якщо CDN ще віддає частковий кеш
+        const alreadyTried = sessionStorage.getItem('tg_auto_updated_to');
+        if (alreadyTried === remoteVersion) return;
+        sessionStorage.setItem('tg_auto_updated_to', remoteVersion);
+
+        if (typeof saveSessionState === 'function') saveSessionState();
+        if (typeof showToast === 'function') {
+            showToast(`🔄 Виявлено нову версію v${remoteVersion}, оновлюємо сторінку...`);
+        }
+
+        // Оновлюємо HTTP-кеш для основної сторінки та ресурсів перед перезавантаженням
+        await Promise.allSettled([
+            fetch(window.location.href, { cache: 'reload' }),
+            fetch(`script2.js?v=${encodeURIComponent(remoteVersion)}`, { cache: 'reload' }),
+            fetch(`index.css?v=${encodeURIComponent(remoteVersion)}`, { cache: 'reload' })
+        ]);
+
+        window.location.reload();
+    } catch (e) {
+        // Ігноруємо мережеві збої під час фонової перевірки
+    }
+}
+
 const APP_CHANGELOG = [
+    {
+        version: "1.4.33",
+        date: "2026-11-12",
+        changes: [
+            { category: "Added", text: "Автоматичне оновлення сайту без дій користувача: впроваджено фоновий детектор нових версій (checkForAppUpdate). При старті, кожні 5 хвилин, а також при поверненні на вкладку браузера сайт перевіряє наявність свіжого релізу на сервері, автоматично скидає кеш браузера, зберігає поточний розподіл та миттєво підтягує нову версію." },
+            { category: "Fixed", text: "Додано версійний cache-busting (?v=...) для script2.js та index.css і мета-теги контролю кешування, щоб браузер ніколи не тримав застарілий код після деплою." }
+        ]
+    },
     {
         version: "1.4.32",
         date: "2026-11-11",
